@@ -1,0 +1,86 @@
+:root {
+  /* Paleta: branco, preto e cinzas */
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --text: #171717;
+  --gray-50: #f7f7f7;
+  --gray-100: #f0f0f0;
+  --gray-400: #a3a3a3;
+  --gray-500: #737373;
+  --gray-600: #525252;
+  --gray-700: #404040;
+  --border: #e8e8e8;
+  --border-strong: #d9d9d9;
+
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+::selection {
+  background: var(--text);
+  color: #fff;
+}
+
+/* ---------- Utilitários globais ---------- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spinner 0.7s linear infinite;
+}
+.spinner--lg {
+  width: 28px;
+  height: 28px;
+  border-color: var(--border);
+  border-top-color: var(--text);
+}
+@keyframes spinner {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.screen-loader {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+}
