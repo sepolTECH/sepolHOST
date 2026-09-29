@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Atualiza o Sepol Host na VPS: puxa o código, sobe API + banco e publica o front para o Nginx.
-#   ./deploy/deploy.sh            (rode como root, ou com um usuário que escreva em /var/www)
+#   ./deploy/deploy.sh            (usuário comum, SEM sudo: precisa estar no grupo "docker" e ser dono de /var/www/sepol-host)
 # Variáveis opcionais: WEBROOT=/var/www/sepol-host
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -17,18 +17,22 @@ main() {
   $COMPOSE up -d --build --remove-orphans
 
   echo "==> 3/4 Compilando o front (dentro do Docker, sem instalar Node na VPS)"
+  if [ ! -d "$WEBROOT" ] || [ ! -w "$WEBROOT" ]; then
+    echo "✖ $WEBROOT não existe ou não é gravável por $(whoami)." >&2
+    echo "  Rode uma vez: sudo mkdir -p $WEBROOT && sudo chown -R $(whoami): $WEBROOT" >&2
+    return 1
+  fi
   docker build --target build -t sepol-host-front-build ./host-front
-  local CID
+  local CID TMP
   CID="$(docker create sepol-host-front-build)"
-  rm -rf "${WEBROOT}.new" && mkdir -p "${WEBROOT}.new"
-  docker cp "$CID:/app/dist/." "${WEBROOT}.new/"
+  TMP="$(mktemp -d)"
+  docker cp "$CID:/app/dist/." "$TMP/"
   docker rm "$CID" >/dev/null
 
   echo "==> 4/4 Publicando em $WEBROOT"
-  rm -rf "${WEBROOT}.old"
-  if [ -d "$WEBROOT" ]; then mv "$WEBROOT" "${WEBROOT}.old"; fi
-  mv "${WEBROOT}.new" "$WEBROOT"
-  rm -rf "${WEBROOT}.old"
+  find "$WEBROOT" -mindepth 1 -delete
+  cp -a "$TMP"/. "$WEBROOT"/
+  rm -rf "$TMP"
   chmod -R a+rX "$WEBROOT"
 
   echo "==> Verificando a API"

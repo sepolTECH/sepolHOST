@@ -23,6 +23,10 @@ Os dados ficam em volumes do Docker (`pgdata` = banco, `uploads` = fotos e anexo
 O site (React/Vite) é compilado **dentro do Docker** pelo script `deploy/deploy.sh`; você não precisa instalar Node
 na VPS.
 
+> **Usuário:** este guia assume que você trabalha na VPS com um **usuário comum que tem `sudo`** (ex.: `sepoltech`),
+> não com `root`. Só o que mexe no sistema (instalar pacotes, firewall, Nginx, Certbot) leva `sudo`. Docker, Git,
+> `deploy.sh`, backup e `.env` rodam **sem** `sudo` — o passo 2 deixa tudo preparado para isso.
+
 ---
 
 ## Antes de começar — o que você precisa
@@ -50,35 +54,47 @@ Confira se já propagou (no seu computador): `nslookup host.seudominio.com.br` �
 
 ## Passo 2 — Preparar a VPS
 
-Conecte por SSH (`ssh root@IP-DA-VPS`) e rode:
+Conecte por SSH com o seu usuário (`ssh sepoltech@IP-DA-VPS`) e rode:
 
 ```bash
 # Atualiza o sistema
-apt update && apt upgrade -y
+sudo apt update && sudo apt upgrade -y
 
 # Docker + Docker Compose
-curl -fsSL https://get.docker.com | sh
-docker --version && docker compose version
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER          # permite usar docker SEM sudo
 
-# Git, Nginx e Certbot (HTTPS)
-apt install -y git nginx certbot python3-certbot-nginx
+# Git, Nginx, Certbot (HTTPS) e Firewall
+sudo apt install -y git nginx certbot python3-certbot-nginx ufw
 
 # Firewall: libera só SSH, HTTP e HTTPS (nunca abra 3333 nem 5432)
-apt install -y ufw
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
-ufw status
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+sudo ufw status
 
-# Confirma que o Nginx subiu (abrir http://IP-DA-VPS no navegador mostra "Welcome to nginx")
-systemctl enable --now nginx
-systemctl status nginx --no-pager
+# Nginx ligado e iniciando com o servidor
+sudo systemctl enable --now nginx
 ```
 
-> Se você usa um usuário comum em vez de `root`, adicione-o ao grupo do Docker: `usermod -aG docker SEU-USUARIO`
-> (e entre de novo no SSH). Nos comandos abaixo, use `sudo` se necessário — o `deploy/deploy.sh` grava em
-> `/var/www`, então rode-o com `sudo` também.
+**Saia do SSH (`exit`) e entre de novo** — é isso que ativa o grupo `docker` para o seu usuário. Depois confira:
+
+```bash
+docker --version && docker compose version
+docker ps                               # deve listar (vazio) sem erro de permissão
+```
+
+Agora crie as duas pastas do projeto e passe a posse para o seu usuário (assim o `git` e o `deploy.sh` funcionam
+sem `sudo`):
+
+```bash
+sudo mkdir -p /opt/sepol-host /var/www/sepol-host /opt/backups
+sudo chown -R $USER:$USER /opt/sepol-host /var/www/sepol-host /opt/backups
+```
+
+> Se o `sudo` disser que o usuário não está no arquivo sudoers, entre como root (console do provedor) e rode
+> `usermod -aG sudo SEU-USUARIO`.
 
 > **Se a VPS já tem outros sites no Nginx:** tudo bem, cada site fica no seu próprio arquivo em
 > `sites-available` e o Nginx separa pelo `server_name`. Só **não** apague o `default` do passo 7 se algum outro site
@@ -161,7 +177,7 @@ No DNS do domínio do remetente, adicione também os registros **SPF, DKIM e DMA
 os e-mails de redefinição de senha tendem a cair no spam. Sem `SMTP_HOST`, o e-mail **não é enviado** (o link só
 aparece no log da API).
 
-Proteja o arquivo: `chmod 600 .env`. **Nunca** envie o `.env` para o GitHub (o `.gitignore` já o ignora).
+Proteja o arquivo: `chmod 600 .env` (sem `sudo`; o arquivo é seu). **Nunca** envie o `.env` para o GitHub (o `.gitignore` já o ignora).
 
 ## Passo 6 — Primeiro deploy: API, banco e site
 
@@ -170,7 +186,7 @@ O script faz tudo: sobe o banco e a API no Docker, compila o site e publica em `
 ```bash
 cd /opt/sepol-host
 chmod +x deploy/*.sh          # o Git no Windows costuma perder a permissão de execução
-./deploy/deploy.sh
+./deploy/deploy.sh            # SEM sudo
 ```
 
 A primeira vez demora alguns minutos (baixa imagens e compila a API e o site). No final ele testa a API e deve
@@ -190,35 +206,35 @@ ls /var/www/sepol-host                                        # deve ter index.h
 cd /opt/sepol-host
 
 # 1) Copia o modelo e troca SEU-DOMINIO pelo seu domínio
-cp deploy/nginx/sepol-host.conf /etc/nginx/sites-available/sepol-host
-sed -i 's/SEU-DOMINIO/host.seudominio.com.br/' /etc/nginx/sites-available/sepol-host
+sudo cp deploy/nginx/sepol-host.conf /etc/nginx/sites-available/sepol-host
+sudo sed -i 's/SEU-DOMINIO/host.seudominio.com.br/' /etc/nginx/sites-available/sepol-host
 
 # 2) Ativa o site e desativa a página padrão do Nginx
-ln -s /etc/nginx/sites-available/sepol-host /etc/nginx/sites-enabled/sepol-host
-rm -f /etc/nginx/sites-enabled/default
+sudo ln -s /etc/nginx/sites-available/sepol-host /etc/nginx/sites-enabled/sepol-host
+sudo rm -f /etc/nginx/sites-enabled/default
 
 # 3) Testa a sintaxe e recarrega
-nginx -t && systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 O que o arquivo faz: serve o site em `/var/www/sepol-host`, repassa `/api/` para `127.0.0.1:3333` (com os
 cabeçalhos `X-Forwarded-*` que a API usa para enxergar o IP real no limite de tentativas de login), faz cache longo
 dos arquivos em `/assets/`, nunca cacheia o `index.html` e manda qualquer rota desconhecida para o `index.html`
-(o site é uma SPA). Se você editar o arquivo, sempre rode `nginx -t` antes de `systemctl reload nginx`.
+(o site é uma SPA). Se você editar o arquivo (`sudo nano /etc/nginx/sites-available/sepol-host`), sempre rode `sudo nginx -t` antes de `sudo systemctl reload nginx`.
 
 Teste pelo HTTP: `curl -i http://host.seudominio.com.br/api/health` → `{"status":"ok","database":"up"}`.
 
 ## Passo 8 — Ativar o HTTPS (Certbot)
 
 ```bash
-certbot --nginx -d host.seudominio.com.br --redirect -m seu@email.com --agree-tos --no-eff-email
+sudo certbot --nginx -d host.seudominio.com.br --redirect -m seu@email.com --agree-tos --no-eff-email
 ```
 
 O Certbot emite o certificado, acrescenta o bloco HTTPS (porta 443) no arquivo do Nginx e redireciona o HTTP para
 HTTPS. A renovação é automática (um timer do systemd renova antes de vencer). Confirme:
 
 ```bash
-certbot renew --dry-run          # deve terminar com "Congratulations, all simulated renewals succeeded"
+sudo certbot renew --dry-run     # deve terminar com "Congratulations, all simulated renewals succeeded"
 systemctl list-timers | grep certbot
 ```
 
@@ -241,14 +257,14 @@ Verificação rápida da API: `curl https://SEU-DOMINIO/api/health` → `{"statu
 
 ```bash
 cd /opt/sepol-host
-./deploy/backup.sh /opt/backups     # banco + fotos/anexos; guarda 14 dias
+./deploy/backup.sh /opt/backups     # banco + fotos/anexos; guarda 14 dias (sem sudo)
 ls -lh /opt/backups
 ```
 
 Agendar todo dia às 03:00:
 
 ```bash
-( crontab -l 2>/dev/null; echo "0 3 * * * cd /opt/sepol-host && ./deploy/backup.sh /opt/backups >> /var/log/sepol-backup.log 2>&1" ) | crontab -
+( crontab -l 2>/dev/null; echo "0 3 * * * cd /opt/sepol-host && ./deploy/backup.sh /opt/backups >> /opt/backups/backup.log 2>&1" ) | crontab -
 ```
 
 **Copie os backups para fora da VPS** (outro servidor, Google Drive, S3...). Backup só na mesma máquina não protege
@@ -296,12 +312,12 @@ cd /opt/sepol-host
 ./deploy/deploy.sh
 ```
 
-Ele faz `git pull`, reconstrói e reinicia a API (as migrations rodam sozinhas), recompila o site e publica a nova
+Ele (sem `sudo`) faz `git pull`, reconstrói e reinicia a API (as migrations rodam sozinhas), recompila o site e publica a nova
 versão de forma atômica — os dados (volumes), o `.env`, o certificado e a config do Nginx são preservados. **Faça um
 backup antes de atualizações que mexam no banco.**
 
 Só o site mudou? Também vale o `deploy.sh` (o Docker reaproveita o cache e a API nem reinicia). Só mudou o `.env`?
-`docker compose -f docker-compose.prod.yml up -d`. Só mudou a config do Nginx? `nginx -t && systemctl reload nginx`.
+`docker compose -f docker-compose.prod.yml up -d`. Só mudou a config do Nginx? `sudo nginx -t && sudo systemctl reload nginx`.
 
 Para voltar a uma versão anterior, faça o `git revert` do commit problemático **no seu computador**, dê `git push` e
 rode `./deploy/deploy.sh` na VPS. (As migrations já aplicadas no banco não são desfeitas — por isso o backup antes.)
@@ -322,7 +338,7 @@ docker compose -f docker-compose.prod.yml up -d --build --remove-orphans   # rem
 chmod +x deploy/*.sh && ./deploy/deploy.sh
 ```
 
-Depois siga os passos 2 (só a parte de instalar Nginx/Certbot e o UFW), 7 e 8. Como o `docker-compose.prod.yml`
+Depois siga os passos 2 (a parte de instalar Nginx/Certbot, o UFW e criar `/var/www/sepol-host`), 7 e 8. Como o `docker-compose.prod.yml`
 novo não tem mais o `web`, o `git pull` pode reclamar do arquivo se você o tiver editado na VPS: `git stash` antes.
 
 ---
@@ -346,10 +362,10 @@ Se já existem dados no seu Postgres local, faça **antes** de criar outros clie
 | Sintoma | Causa provável e solução |
 | ------- | ------------------------ |
 | Site não abre / Certbot falha | O DNS ainda não aponta para a VPS, ou as portas 80/443 estão bloqueadas (UFW ou firewall do provedor). Teste `curl -I http://SEU-DOMINIO`. |
-| Aparece "Welcome to nginx" | O site `default` ainda está ativo ou o `server_name` está errado: `rm /etc/nginx/sites-enabled/default`, confira o domínio no arquivo e `nginx -t && systemctl reload nginx`. |
-| `403 Forbidden` no site | O Nginx não lê `/var/www/sepol-host`: `chmod -R a+rX /var/www/sepol-host` e confira se há `index.html` lá (rode o `deploy.sh`). |
+| Aparece "Welcome to nginx" | O site `default` ainda está ativo ou o `server_name` está errado: `sudo rm /etc/nginx/sites-enabled/default`, confira o domínio no arquivo e `sudo nginx -t && sudo systemctl reload nginx`. |
+| `403 Forbidden` no site | O Nginx não lê `/var/www/sepol-host`: `chmod -R a+rX /var/www/sepol-host` (você é o dono da pasta, sem `sudo`) e confira se há `index.html` lá (rode o `deploy.sh`). |
 | `502 Bad Gateway` em `/api` | A API ainda está subindo ou caiu. `docker compose -f docker-compose.prod.yml logs --tail=100 api` e `curl http://127.0.0.1:3333/api/health`. |
-| `nginx: [emerg] bind() to 0.0.0.0:80 failed` | Outro processo usa a porta 80 (o container `web` da versão antiga com Caddy, ou o Apache). Veja a seção de migração e `ss -tlnp \| grep ':80'`. |
+| `nginx: [emerg] bind() to 0.0.0.0:80 failed` | Outro processo usa a porta 80 (o container `web` da versão antiga com Caddy, ou o Apache). Veja a seção de migração e `sudo ss -tlnp \| grep ':80'`. |
 | `413 Request Entity Too Large` | Upload maior que `client_max_body_size` (10 MB no modelo). Aumente no arquivo do Nginx e recarregue. |
 | Página em branco ao recarregar uma rota (ex.: `/hospedes`) | Falta o `try_files $uri /index.html;` no `location /` (SPA). Use o modelo de `deploy/nginx/sepol-host.conf`. |
 | Site antigo aparece após atualizar | Cache do navegador: Ctrl+F5. O `index.html` é servido sem cache; se persistir, confirme que o `deploy.sh` terminou sem erro. |
@@ -359,6 +375,9 @@ Se já existem dados no seu Postgres local, faça **antes** de criar outros clie
 | Muitos "tentativas de login" para todo mundo | A API não está enxergando o IP real: confirme os `proxy_set_header X-Forwarded-*` no `location /api/` do Nginx. |
 | "Esqueci minha senha" não envia e-mail | `SMTP_*` vazio ou incorreto; veja `logs api` (o erro de envio aparece lá). |
 | `permission denied` no `backup.sh`/`deploy.sh` | `chmod +x deploy/*.sh` |
+| `permission denied` ao usar `docker` | Seu usuário ainda não está no grupo `docker`: `sudo usermod -aG docker $USER`, saia do SSH e entre de novo. |
+| `deploy.sh` diz que `/var/www/sepol-host` não é gravável | `sudo chown -R $USER:$USER /var/www/sepol-host` |
+| `git pull` no deploy pede senha/chave | Rode o deploy **sem** `sudo` (com `sudo` o Git procura a chave em `/root/.ssh`). |
 | `git pull` reclama de alterações locais | Não edite arquivos do projeto na VPS; se editou, `git stash` e depois `git pull`. |
 
 Comandos úteis (os do Docker, dentro de `/opt/sepol-host`):
@@ -367,9 +386,9 @@ Comandos úteis (os do Docker, dentro de `/opt/sepol-host`):
 - `docker compose -f docker-compose.prod.yml logs --tail=100 api` — últimos logs da API
 - `docker compose -f docker-compose.prod.yml restart api` — reinicia a API
 - `docker compose -f docker-compose.prod.yml down` — para tudo **sem** apagar os dados (nunca use `down -v`: apaga os volumes)
-- `nginx -t && systemctl reload nginx` — valida e aplica a config do Nginx
-- `tail -f /var/log/nginx/error.log` e `/var/log/nginx/access.log` — logs do Nginx
-- `certbot certificates` — validade do certificado
+- `sudo nginx -t && sudo systemctl reload nginx` — valida e aplica a config do Nginx
+- `sudo tail -f /var/log/nginx/error.log` e `/var/log/nginx/access.log` — logs do Nginx
+- `sudo certbot certificates` — validade do certificado
 
 ## Segurança — resumo
 
@@ -379,5 +398,5 @@ Comandos úteis (os do Docker, dentro de `/opt/sepol-host`):
 - Login limitado a 10 tentativas / 15 min por IP; cadastro a 5 / hora por IP.
 - Fotos de documento e anexos só são entregues ao dono do registro.
 - Mantenha o servidor atualizado (`apt update && apt upgrade`), o `.env` fora do Git e os backups fora da VPS.
-- Considere desativar o login SSH por senha (usar só chave), criar um usuário comum em vez de usar `root` e instalar o
-  `fail2ban` (`apt install -y fail2ban`) para bloquear tentativas de força bruta no SSH.
+- Você já usa um usuário comum (bom). Considere também desativar o login SSH do `root` e por senha (usar só chave) e instalar o
+  `fail2ban` (`sudo apt install -y fail2ban`) para bloquear tentativas de força bruta no SSH.
