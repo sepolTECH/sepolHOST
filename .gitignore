@@ -1,7 +1,6 @@
 # Segredos — nunca vão para o GitHub
 .env
 .env.*
-!.env.production.example
 !.env.example
 **/.env
 **/.env.*
