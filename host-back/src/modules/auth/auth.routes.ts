@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { AppError } from '../../utils/AppError.js';
-import { AUTH_COOKIE, ensureAuth } from '../../middlewares/auth.js';
+import { AUTH_COOKIE, ensureAnyAuth } from '../../middlewares/auth.js';
 import { durationToMs } from '../../utils/jwt.js';
 import * as authService from './auth.service.js';
 
@@ -123,7 +123,7 @@ authRoutes.post('/logout', (_req, res) => {
   res.status(204).end();
 });
 
-authRoutes.get('/me', ensureAuth, async (req, res) => {
+authRoutes.get('/me', ensureAnyAuth, async (req, res) => {
   const user = await authService.getById(req.user!.sub);
   res.json({ user });
 });

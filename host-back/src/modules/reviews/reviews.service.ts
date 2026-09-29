@@ -162,7 +162,8 @@ export async function getByReservation(ownerId: string, reservationId: string) {
   return toItem(rows[0]);
 }
 
-export async function save(reservationId: string, input: ReviewInput, userId: string) {
+/** `userId` = dono dos dados (cliente). `actorId` = quem salvou (por padrão o próprio dono; ou o associado). */
+export async function save(reservationId: string, input: ReviewInput, userId: string, actorId: string = userId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -182,11 +183,11 @@ export async function save(reservationId: string, input: ReviewInput, userId: st
               notes                = EXCLUDED.notes,
               updated_by           = EXCLUDED.updated_by,
               updated_at           = NOW()`,
-      [reservationId, input.cleanlinessRating, input.communicationRating, input.rulesRating, input.notes, userId],
+      [reservationId, input.cleanlinessRating, input.communicationRating, input.rulesRating, input.notes, actorId],
     );
     // Bloqueio: bloqueia o hóspede responsável a partir desta hospedagem
     if (input.blockGuest && input.blockReason) {
-      await block(rows[0].main_guest_id, input.blockReason, reservationId, userId, client);
+      await block(rows[0].main_guest_id, input.blockReason, reservationId, actorId, client);
     }
     await client.query('COMMIT');
   } catch (err) {

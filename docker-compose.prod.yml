@@ -1,5 +1,6 @@
-# Produção (VPS): banco + API + site com HTTPS automático.
-#   cp env.production.example .env   (preencha!)
+# Produção (VPS): banco + API em Docker. O Nginx (instalado na VPS) serve o site,
+# cuida do HTTPS (Certbot) e repassa /api para a API em 127.0.0.1:3333.
+#   cp .env.production.example .env   (preencha!)
 #   docker compose -f docker-compose.prod.yml up -d --build
 name: sepol-host
 
@@ -47,27 +48,14 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Administrador}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    # Só no loopback da VPS: o Nginx acessa, a internet não. (O Docker ignora o UFW
+    # para portas publicadas — por isso o "127.0.0.1:" é obrigatório.)
+    ports:
+      - "127.0.0.1:3333:3333"
     volumes:
       # Fotos de documento e anexos — entram no backup junto com o banco
       - uploads:/app/uploads
 
-  web:
-    build: ./host-front
-    restart: unless-stopped
-    depends_on:
-      - api
-    environment:
-      DOMAIN: ${DOMAIN}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - caddy_data:/data      # certificados HTTPS (não apague)
-      - caddy_config:/config
-
 volumes:
   pgdata:
   uploads:
-  caddy_data:
-  caddy_config:

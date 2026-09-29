@@ -1,0 +1,318 @@
+/* =========================================================
+   Inventário: itens do imóvel + vistoria por reserva
+   (reaproveita Guests.css e Reservations.css)
+   ========================================================= */
+
+.inv-tabs {
+  max-width: 360px;
+  margin-bottom: 16px;
+}
+.inv-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.panel__filter.panel__filter--inventory {
+  width: 440px;
+}
+
+/* ---------- Seleção do imóvel ---------- */
+.inv-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.inv-toolbar__select {
+  flex: 1;
+  max-width: 460px;
+}
+.inv-newprop {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: 620px;
+}
+.inv-newprop .ui-field {
+  flex: 1;
+}
+.inv-newprop .ui-btn {
+  margin-top: 27px;
+}
+.inv-panel {
+  padding: 18px 20px 20px;
+}
+.inv-panel__hint {
+  margin-bottom: 14px;
+}
+
+/* ---------- Editor de itens ---------- */
+.inv-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 160px auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.inv-add__btn {
+  height: 42px;
+}
+.inv-add__error {
+  grid-column: 1 / -1;
+}
+.inv-editor__error {
+  margin-bottom: 8px;
+}
+.table--inventory .num {
+  width: 1%;
+}
+.inv-input--qty {
+  width: 72px;
+  text-align: right;
+}
+.inv-input--money {
+  width: 140px;
+  text-align: right;
+}
+.inv-name {
+  font-weight: 500;
+}
+.inv-total {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.inv-empty {
+  padding: 28px 12px !important;
+  text-align: center;
+  color: var(--gray-500);
+}
+.inv-actions {
+  white-space: nowrap;
+}
+/* ações sempre visíveis (a base só mostra no hover da linha clicável) */
+.table--inventory .table__actions .icon-btn {
+  opacity: 1;
+}
+
+.inv-confirm {
+  display: inline-flex;
+  gap: 6px;
+}
+.inv-confirm button {
+  height: 28px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.inv-confirm__yes {
+  color: #fff;
+  background: var(--danger);
+  border: 1px solid var(--danger);
+}
+.inv-confirm__no {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+}
+
+/* ---------- Check de conferência ---------- */
+.inv-col-check {
+  width: 52px;
+  padding-right: 0 !important;
+}
+.inv-check {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: transparent;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+}
+.inv-check svg {
+  width: 16px;
+  height: 16px;
+}
+.inv-check:hover:not(:disabled) {
+  border-color: var(--text);
+  color: var(--gray-400);
+}
+.inv-check:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.inv-check.is-on {
+  color: var(--on-text);
+  background: var(--text);
+  border-color: var(--text);
+}
+.inv-check:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.inv-check:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.table--inventory tr.is-checked .inv-name {
+  color: var(--gray-500);
+  text-decoration: line-through;
+  text-decoration-color: var(--gray-400);
+}
+
+/* ---------- Situação da vistoria ---------- */
+.inv-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 999px;
+}
+.inv-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.inv-status--pendente {
+  color: var(--gray-600);
+  border: 1px dashed var(--border-strong);
+}
+.inv-status--vistoriado {
+  color: var(--on-text);
+  background: var(--text);
+}
+
+/* barra de progresso na tabela */
+.inv-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.inv-mini__bar {
+  width: 70px;
+  height: 6px;
+  overflow: hidden;
+  background: var(--gray-100);
+  border-radius: 999px;
+}
+.inv-mini__bar span,
+.inv-progress span {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.inv-mini small {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-variant-numeric: tabular-nums;
+}
+.inv-none {
+  font-size: 12px;
+  color: var(--gray-400);
+}
+
+/* ---------- Modal de vistoria ---------- */
+.inv-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.inv-modal__state {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--gray-500);
+}
+.inv-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.inv-summary__main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.inv-summary__meta {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.inv-summary__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+.inv-summary__numbers strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.inv-progress {
+  height: 6px;
+  overflow: hidden;
+  background: var(--gray-200);
+  border-radius: 999px;
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 1100px) {
+  .panel__filter.panel__filter--inventory {
+    width: 100%;
+  }
+}
+@media (max-width: 720px) {
+  .inv-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inv-kpis .kpi--dark {
+    grid-column: 1 / -1;
+  }
+  .inv-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .inv-toolbar__select {
+    max-width: none;
+  }
+  .inv-newprop {
+    flex-wrap: wrap;
+  }
+  .inv-newprop .ui-btn {
+    margin-top: 0;
+  }
+  .inv-add {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+  .inv-add__name {
+    grid-column: 1 / -1;
+  }
+  .inv-add__btn {
+    grid-column: 1 / -1;
+  }
+  .inv-input--money {
+    width: 120px;
+  }
+}

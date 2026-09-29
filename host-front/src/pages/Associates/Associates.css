@@ -1,0 +1,213 @@
+/* Página "Associados" (visão do cliente) */
+.assoc__state {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+.assoc__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--gray-500);
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+}
+.assoc__empty strong {
+  color: var(--text-strong);
+  font-size: 16px;
+}
+.assoc__empty p {
+  max-width: 420px;
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.assoc__list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.assoc__card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.assoc__card.is-inactive {
+  opacity: 0.7;
+}
+.assoc__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.assoc__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.assoc__name strong {
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.assoc__email {
+  font-size: 14px;
+  color: var(--gray-600);
+  overflow-wrap: anywhere;
+}
+.assoc__meta {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.assoc__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.assoc__form {
+  display: grid;
+  gap: 16px;
+}
+
+/* Credenciais geradas */
+.assoc__creds {
+  display: grid;
+  gap: 16px;
+}
+.assoc__creds-warn {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.assoc__creds-box {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 16px;
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.assoc__creds-box dt {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+.assoc__creds-box dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.assoc__password {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 26px !important;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-strong);
+  user-select: all;
+}
+.assoc__creds-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.assoc__creds-actions .ui-btn {
+  text-decoration: none;
+}
+
+/* Liberar reservas */
+.assoc__release {
+  display: grid;
+  gap: 12px;
+}
+.assoc__release-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.assoc__release-tools .ui-input-icon {
+  flex: 1 1 240px;
+}
+.assoc__res-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.assoc__res {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.assoc__res:hover {
+  border-color: var(--border-strong);
+}
+.assoc__res.is-on {
+  background: var(--gray-50);
+  border-color: var(--text);
+}
+.assoc__res input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--text);
+}
+.assoc__res-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.assoc__res-main strong {
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.assoc__res-main span {
+  font-size: 13px;
+  color: var(--gray-500);
+  overflow-wrap: anywhere;
+}
+.assoc__res-dates {
+  font-size: 13px;
+  color: var(--gray-600);
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .assoc__res {
+    flex-wrap: wrap;
+  }
+  .assoc__res-dates {
+    width: 100%;
+    padding-left: 32px;
+  }
+}

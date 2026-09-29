@@ -36,6 +36,20 @@ export const reviewSchema = z
 
 export type ReviewInput = z.infer<typeof reviewSchema>;
 
+/** Avaliação feita pelo associado: só notas e observação (bloquear hóspede é decisão do cliente). */
+export const associateReviewSchema = z.object({
+  cleanlinessRating: rating('limpeza'),
+  communicationRating: rating('comunicação'),
+  rulesRating: rating('cumprimento de regras'),
+  notes: z
+    .string()
+    .trim()
+    .max(2000, 'Observações muito longas (máx. 2000 caracteres)')
+    .nullish()
+    .transform((v) => (v ? v : null)),
+});
+export type AssociateReviewInput = z.infer<typeof associateReviewSchema>;
+
 export const listQuerySchema = z.object({
   search: z.string().trim().max(100).optional().default(''),
   // PENDENTE = sem avaliação | AVALIADA = com avaliação

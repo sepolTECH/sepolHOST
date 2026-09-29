@@ -46,7 +46,7 @@ export interface User {
   id: string
   name: string
   email: string
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'associate'
 }
 
 export const authApi = {
@@ -926,4 +926,256 @@ export const calendarApi = {
     api<void>('/calendar/links', { method: 'PUT', body: JSON.stringify({ feedId, eventKey, reservationId }) }),
   unlink: (feedId: string, eventKey: string) =>
     api<void>('/calendar/links', { method: 'DELETE', body: JSON.stringify({ feedId, eventKey }) }),
+}
+
+// ---------------------------------------------------------------------------
+// Inventário e vistoria
+// ---------------------------------------------------------------------------
+
+export type InventoryStatus = 'PENDENTE' | 'VISTORIADO'
+
+/** Dados de um item (quantidade e valor unitário em centavos). */
+export interface InventoryItemInput {
+  name: string
+  quantity: number
+  valueCents: number
+}
+
+export interface InventoryProperty {
+  name: string
+  itemsCount: number
+  totalCents: number
+  reservationsCount: number
+}
+
+export interface PropertyInventoryItem extends InventoryItemInput {
+  id: string
+  propertyName: string
+  totalCents: number
+}
+
+export interface InspectionRow {
+  id: string
+  reservationNumber: string
+  propertyName: string
+  guestName: string
+  checkIn: string
+  finalCheckOut: string
+  status: ReservationStatus
+  platform: string | null
+  inventoryStatus: InventoryStatus
+  inspectedAt: string | null
+  itemsCount: number
+  checkedCount: number
+  totalCents: number
+}
+
+export interface InspectionList {
+  data: InspectionRow[]
+  total: number
+  page: number
+  pageSize: number
+  counts: { all: number; pending: number; inspected: number }
+}
+
+export interface InspectionListParams {
+  search?: string
+  status?: InventoryStatus
+  page?: number
+  pageSize?: number
+}
+
+export interface ReservationInventoryItem extends InventoryItemInput {
+  id: string
+  totalCents: number
+  checked: boolean
+  checkedAt: string | null
+}
+
+export interface ReservationInventory {
+  reservation: {
+    id: string
+    reservationNumber: string
+    propertyName: string
+    guestName: string
+    checkIn: string
+    finalCheckOut: string
+    status: ReservationStatus
+    inventoryStatus: InventoryStatus
+    inspectedAt: string | null
+    inspectedByName: string | null
+  }
+  items: ReservationInventoryItem[]
+  summary: { itemsCount: number; checkedCount: number; totalCents: number }
+}
+
+const json = (body: unknown) => JSON.stringify(body)
+
+export const inventoryApi = {
+  // Inventário do imóvel (modelo copiado para cada nova reserva)
+  properties: () => api<{ data: InventoryProperty[] }>('/inventory/properties'),
+  items: (property: string, signal?: AbortSignal) =>
+    api<{ items: PropertyInventoryItem[]; totalCents: number }>(
+      `/inventory/items?${new URLSearchParams({ property })}`,
+      { signal },
+    ),
+  addItem: (property: string, input: InventoryItemInput) =>
+    api<{ item: PropertyInventoryItem }>('/inventory/items', {
+      method: 'POST',
+      body: json({ propertyName: property, ...input }),
+    }),
+  updateItem: (id: string, input: InventoryItemInput) =>
+    api<{ item: PropertyInventoryItem }>(`/inventory/items/${id}`, { method: 'PUT', body: json(input) }),
+  removeItem: (id: string) => api<void>(`/inventory/items/${id}`, { method: 'DELETE' }),
+
+  // Vistoria por reserva
+  reservations: (params: InspectionListParams = {}, signal?: AbortSignal) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    })
+    return api<InspectionList>(`/inventory/reservations?${qs}`, { signal })
+  },
+  reservation: (id: string) => api<ReservationInventory>(`/inventory/reservations/${id}`),
+  addReservationItem: (id: string, input: InventoryItemInput) =>
+    api<ReservationInventory>(`/inventory/reservations/${id}/items`, { method: 'POST', body: json(input) }),
+  updateReservationItem: (id: string, itemId: string, input: InventoryItemInput) =>
+    api<ReservationInventory>(`/inventory/reservations/${id}/items/${itemId}`, {
+      method: 'PUT',
+      body: json(input),
+    }),
+  removeReservationItem: (id: string, itemId: string) =>
+    api<ReservationInventory>(`/inventory/reservations/${id}/items/${itemId}`, { method: 'DELETE' }),
+  checkItem: (id: string, itemId: string, checked: boolean) =>
+    api<ReservationInventory>(`/inventory/reservations/${id}/items/${itemId}/check`, {
+      method: 'PATCH',
+      body: json({ checked }),
+    }),
+  checkAll: (id: string, checked: boolean) =>
+    api<ReservationInventory>(`/inventory/reservations/${id}/check-all`, { method: 'POST', body: json({ checked }) }),
+  inspect: (id: string) => api<ReservationInventory>(`/inventory/reservations/${id}/inspect`, { method: 'POST' }),
+  reopen: (id: string) => api<ReservationInventory>(`/inventory/reservations/${id}/reopen`, { method: 'POST' }),
+}
+
+
+// ---------------------------------------------------------------------------
+// Associados (funcionários / diaristas) — gestão feita pelo cliente
+// ---------------------------------------------------------------------------
+
+export interface Associate {
+  id: string
+  name: string
+  email: string
+  isActive: boolean
+  lastLoginAt: string | null
+  createdAt: string
+  releasedCount: number
+}
+
+export interface AssociateCredentials {
+  associate: Associate
+  /** Senha gerada — só é devolvida na criação e ao gerar uma nova senha. */
+  password: string
+}
+
+export const associatesApi = {
+  list: () => api<{ data: Associate[] }>('/associates'),
+  create: (input: { name: string; email: string }) =>
+    api<AssociateCredentials>('/associates', { method: 'POST', body: json(input) }),
+  update: (id: string, input: { name?: string; isActive?: boolean }) =>
+    api<{ associate: Associate }>(`/associates/${id}`, { method: 'PATCH', body: json(input) }),
+  resetPassword: (id: string) => api<AssociateCredentials>(`/associates/${id}/reset-password`, { method: 'POST' }),
+  remove: (id: string) => api<void>(`/associates/${id}`, { method: 'DELETE' }),
+
+  // Liberação de reservas
+  releasedReservations: (id: string) => api<{ reservationIds: string[] }>(`/associates/${id}/reservations`),
+  bulkAccess: (input: { associateId: string; reservationIds: string[]; granted: boolean }) =>
+    api<{ updated: number }>('/associates/access/bulk', { method: 'POST', body: json(input) }),
+  reservationAssociates: (reservationId: string) =>
+    api<{ associateIds: string[] }>(`/associates/by-reservation/${reservationId}`),
+  setReservationAssociates: (reservationId: string, associateIds: string[]) =>
+    api<{ associateIds: string[] }>(`/associates/by-reservation/${reservationId}`, {
+      method: 'PUT',
+      body: json({ associateIds }),
+    }),
+}
+
+// ---------------------------------------------------------------------------
+// Área do associado (/api/associate): só vistoria e avaliação das reservas liberadas
+// ---------------------------------------------------------------------------
+
+export interface AssociateReservationRow {
+  id: string
+  reservationNumber: string
+  propertyName: string
+  guestName: string
+  checkIn: string
+  finalCheckOut: string
+  status: ReservationStatus
+  inventoryStatus: InventoryStatus
+  reviewed: boolean
+  itemsCount: number
+  checkedCount: number
+}
+
+export interface AssociateInventoryItem {
+  id: string
+  name: string
+  quantity: number
+  checked: boolean
+}
+
+export interface AssociateInventory {
+  reservation: {
+    id: string
+    reservationNumber: string
+    propertyName: string
+    guestName: string
+    checkIn: string
+    finalCheckOut: string
+    inventoryStatus: InventoryStatus
+    inspectedAt: string | null
+  }
+  items: AssociateInventoryItem[]
+  summary: { itemsCount: number; checkedCount: number }
+}
+
+export interface AssociateReviewInput {
+  cleanlinessRating: number
+  communicationRating: number
+  rulesRating: number
+  notes: string
+}
+
+export interface AssociateReviewData {
+  reservation: {
+    id: string
+    reservationNumber: string
+    propertyName: string
+    guestName: string
+    checkIn: string
+    finalCheckOut: string
+  }
+  review: {
+    cleanlinessRating: number
+    communicationRating: number
+    rulesRating: number
+    notes: string | null
+  } | null
+}
+
+export const associateAreaApi = {
+  reservations: () => api<{ data: AssociateReservationRow[] }>('/associate/reservations'),
+  inventory: (id: string) => api<AssociateInventory>(`/associate/reservations/${id}/inventory`),
+  checkItem: (id: string, itemId: string, checked: boolean) =>
+    api<AssociateInventory>(`/associate/reservations/${id}/items/${itemId}/check`, {
+      method: 'PATCH',
+      body: json({ checked }),
+    }),
+  checkAll: (id: string, checked: boolean) =>
+    api<AssociateInventory>(`/associate/reservations/${id}/check-all`, { method: 'POST', body: json({ checked }) }),
+  inspect: (id: string) => api<AssociateInventory>(`/associate/reservations/${id}/inspect`, { method: 'POST' }),
+  review: (id: string) => api<AssociateReviewData>(`/associate/reservations/${id}/review`),
+  saveReview: (id: string, input: AssociateReviewInput) =>
+    api<AssociateReviewData>(`/associate/reservations/${id}/review`, { method: 'PUT', body: json(input) }),
 }

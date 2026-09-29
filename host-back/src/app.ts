@@ -12,6 +12,9 @@ import { blocklistRoutes } from './modules/blocklist/blocklist.routes.js';
 import { reviewsRoutes } from './modules/reviews/reviews.routes.js';
 import { financeRoutes } from './modules/finance/finance.routes.js';
 import { calendarRoutes } from './modules/calendar/calendar.routes.js';
+import { inventoryRoutes } from './modules/inventory/inventory.routes.js';
+import { associatesRoutes } from './modules/associates/associates.routes.js';
+import { associateAreaRoutes } from './modules/associate-area/associate-area.routes.js';
 
 export const app = express();
 
@@ -44,6 +47,9 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/blocklist', blocklistRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/associates', associatesRoutes);
+app.use('/api/associate', associateAreaRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Rota não encontrada' });

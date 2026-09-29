@@ -3,6 +3,7 @@ import { pool, query } from '../../db/pool.js';
 import { AppError } from '../../utils/AppError.js';
 import { absolutePath, detectFileType, removeFile, saveFile } from '../../utils/storage.js';
 import { syncFromReservation } from '../dependents/dependents.service.js';
+import { loadOnReservationCreated, resyncOnPropertyChange } from '../inventory/inventory.service.js';
 import type { AttachmentCategory, ListQuery, ReservationInput } from './reservations.schema.js';
 
 type Status = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO';
@@ -386,6 +387,8 @@ export function create(input: ReservationInput, userId: string) {
       [...values, userId],
     );
     await saveChildren(client, rows[0].id, input);
+    // Copia o inventário do imóvel para a reserva (pode ser ajustado só nela)
+    await loadOnReservationCreated(client, userId, rows[0].id);
     return getById(userId, rows[0].id, client);
   });
 }
@@ -394,6 +397,10 @@ export function update(id: string, input: ReservationInput, userId: string) {
   return inTransaction(async (client) => {
     const values = FIELDS.map(([, v]) => v(input));
     const sets = FIELDS.map(([c], i) => `${c} = $${i + 2}`);
+    const { rows: previous } = await client.query<{ property_name: string }>(
+      'SELECT property_name FROM reservations WHERE id = $1 AND owner_id = $2',
+      [id, userId],
+    );
     const { rowCount } = await client.query(
       `UPDATE reservations
           SET ${sets.join(', ')}, updated_by = $${values.length + 2}, updated_at = NOW()
@@ -402,6 +409,8 @@ export function update(id: string, input: ReservationInput, userId: string) {
     );
     if (!rowCount) throw new AppError('Reserva não encontrada', 404);
     await saveChildren(client, id, input);
+    // Trocou de imóvel e a vistoria ainda não começou: passa a usar o inventário do novo imóvel
+    if (previous[0]) await resyncOnPropertyChange(client, userId, id, previous[0].property_name);
     return getById(userId, id, client);
   });
 }

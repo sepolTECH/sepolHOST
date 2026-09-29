@@ -4,12 +4,18 @@ import { AuthLayout } from './components/layout/AuthLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { AssociateLayout } from './components/layout/AssociateLayout'
+import { Associates } from './pages/Associates/Associates'
+import { AssociateHome } from './pages/AssociateArea/AssociateHome'
+import { AssociateInspection } from './pages/AssociateArea/AssociateInspection'
+import { AssociateReview } from './pages/AssociateArea/AssociateReview'
 import { Blocklist } from './pages/Blocklist/Blocklist'
 import { Calendar } from './pages/Calendar/CalendarPage'
 import { Closing } from './pages/Finance/Closing'
 import { Finance } from './pages/Finance/Finance'
 import { ForgotPassword } from './pages/ForgotPassword/ForgotPassword'
 import { Guests } from './pages/Guests/Guests'
+import { Inventory } from './pages/Inventory/Inventory'
 import { Login } from './pages/Login/Login'
 import { Register } from './pages/Register/Register'
 import { Reservations } from './pages/Reservations/Reservations'
@@ -40,8 +46,19 @@ function App() {
                 <Route path="/financas" element={<Navigate to="/financas/fechamento" replace />} />
                 <Route path="/financas/fechamento" element={<Closing />} />
                 <Route path="/financas/relatorio" element={<Finance />} />
+                <Route path="/associados" element={<Associates />} />
+                <Route path="/inventario" element={<Inventory />} />
                 <Route path="/avaliacoes" element={<Reviews />} />
                 <Route path="/bloqueados" element={<Blocklist />} />
+              </Route>
+            </Route>
+
+            {/* Área do associado: simples, feita para o celular */}
+            <Route element={<ProtectedRoute area="associate" />}>
+              <Route element={<AssociateLayout />}>
+                <Route path="/associado" element={<AssociateHome />} />
+                <Route path="/associado/reserva/:id/vistoria" element={<AssociateInspection />} />
+                <Route path="/associado/reserva/:id/avaliacao" element={<AssociateReview />} />
               </Route>
             </Route>
 

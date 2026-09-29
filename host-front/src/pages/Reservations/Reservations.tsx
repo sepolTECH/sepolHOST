@@ -1,4 +1,4 @@
-import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Eye, Paperclip, Pencil, Plus, Search, Star } from 'lucide-react'
+import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Eye, Paperclip, Pencil, Plus, Search, Star, UserCheck } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Segmented } from '../../components/ui/Segmented'
@@ -16,6 +16,7 @@ import { CommissionPct } from '../../components/ui/CommissionPct'
 import { PLATFORM_LABEL } from './options'
 import '../Guests/Guests.css'
 import { ReservationFormModal, type ReservationPrefill } from './ReservationFormModal'
+import { ReservationAccessModal } from './ReservationAccessModal'
 import { ReservationViewModal } from './ReservationViewModal'
 import './Reservations.css'
 import { STATUS_LABEL, STATUS_OPTIONS } from './status'
@@ -41,6 +42,7 @@ export function Reservations() {
   const [editing, setEditing] = useState<Reservation | null>(null)
   const [extending, setExtending] = useState(false) // aberto pelo atalho "Estender hospedagem"
   const [viewing, setViewing] = useState<Reservation | null>(null)
+  const [releasing, setReleasing] = useState<Reservation | null>(null) // liberar para associados
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const toastTimer = useRef<number>(undefined)
@@ -417,6 +419,15 @@ export function Reservations() {
                           >
                             <Star strokeWidth={1.8} />
                           </button>
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={() => setReleasing(r)}
+                            aria-label={`Liberar reserva ${r.reservationNumber} para associados`}
+                            title="Liberar para associados"
+                          >
+                            <UserCheck strokeWidth={1.8} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -474,6 +485,13 @@ export function Reservations() {
         onClose={() => setViewing(null)}
         onEdit={(r) => openEdit(r)}
         onExtend={openExtend}
+      />
+
+      <ReservationAccessModal
+        key={releasing?.id ?? 'none'}
+        reservation={releasing}
+        onClose={() => setReleasing(null)}
+        onNotify={showToast}
       />
 
       <div className={`toast ${toast ? 'is-visible' : ''}`} role="status" aria-live="polite">

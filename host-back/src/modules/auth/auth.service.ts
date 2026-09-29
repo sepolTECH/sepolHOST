@@ -11,7 +11,7 @@ interface UserRow {
   name: string;
   email: string;
   password_hash: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'associate';
   is_active: boolean;
 }
 
