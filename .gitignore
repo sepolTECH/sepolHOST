@@ -1,11 +1,12 @@
 # Segredos — nunca vão para o GitHub
 .env
 .env.*
-!.env.production.example
 !.env.example
 **/.env
 **/.env.*
 !**/.env.example
+!.env.production.example
+!**/.env.production.example
 
 # Dependências e builds
 node_modules/
