@@ -1,0 +1,73 @@
+# Produção (VPS): banco + API + site com HTTPS automático.
+#   cp env.production.example .env   (preencha!)
+#   docker compose -f docker-compose.prod.yml up -d --build
+name: sepol-host
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sem "ports": o banco só é acessível pela API, dentro da rede do Docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./host-back
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      JWT_EXPIRES_IN_REMEMBER: ${JWT_EXPIRES_IN_REMEMBER:-30d}
+      CORS_ORIGIN: https://${DOMAIN:?defina DOMAIN no .env}
+      APP_URL: https://${DOMAIN}
+      COOKIE_SECURE: "true"
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Sepol Host <no-reply@sepol.com.br>}
+      UPLOADS_DIR: uploads
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      # Fotos de documento e anexos — entram no backup junto com o banco
+      - uploads:/app/uploads
+
+  web:
+    build: ./host-front
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data      # certificados HTTPS (não apague)
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

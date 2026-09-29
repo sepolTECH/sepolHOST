@@ -1,0 +1,141 @@
+/* ---------- Alerta de hóspede bloqueado ---------- */
+.blocked-alert {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 12px;
+  animation: blocked-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.blocked-alert__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--danger);
+}
+.blocked-alert__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.blocked-alert__body strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--danger);
+}
+.blocked-alert__reason {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.blocked-alert__body small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.blocked-alert__body a {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* Etiqueta curta "Bloqueado" (listas e tabelas) */
+.blocked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  background: var(--danger);
+  border-radius: 999px;
+}
+.blocked-badge svg {
+  width: 12px;
+  height: 12px;
+}
+@keyframes blocked-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ---------- Avisos de dependente (DependentNotice) ---------- */
+.dependent-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dependent-notice__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dependent-notice__list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Aviso informativo (neutro): documento já cadastrado como dependente */
+.dependent-notice {
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--text);
+  background: var(--gray-50);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  animation: blocked-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.dependent-notice__icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--gray-600);
+}
+.dependent-notice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dependent-notice__body strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+.dependent-notice__body p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gray-600);
+  overflow-wrap: anywhere;
+}
+.dependent-notice__body b,
+.dependent-notice__list b {
+  font-weight: 600;
+  color: var(--text);
+}
+/* Versão compacta (linha de acompanhante na reserva) */
+.dependent-notices--compact .blocked-alert,
+.dependent-notices--compact .dependent-notice {
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+.dependent-notices--compact .blocked-alert__body strong,
+.dependent-notices--compact .blocked-alert__reason {
+  font-size: 13px;
+}

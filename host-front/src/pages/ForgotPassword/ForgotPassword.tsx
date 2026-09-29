@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { ApiError, authApi } from '../../services/api'
 import { EMAIL_RE } from '../../utils/password'
 import '../Login/Login.css'
-import logoSepolhost from '../../assets/logo-sepolhost.png'
+import { Logo } from '../../components/Logo'
 
 type Status = 'idle' | 'loading' | 'sent' | 'error'
 
@@ -54,7 +54,7 @@ export function ForgotPassword() {
         noValidate
       >
         <div className="logo-sepolhost-login">
-          <img src={logoSepolhost} alt="" className="img-sepolhost-login" />
+          <Logo className="img-sepolhost-login" />
         </div>
 
         {status === 'sent' ? (

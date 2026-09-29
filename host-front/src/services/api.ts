@@ -2,13 +2,23 @@
 // Em produção, defina VITE_API_URL (ex.: https://api.seudominio.com.br) ou sirva o front e o back no mesmo domínio.
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
+export interface FieldError {
+  field: string
+  message: string
+}
+
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  errors: FieldError[]
+  constructor(message: string, status: number, errors: FieldError[] = []) {
     super(message)
     this.status = status
+    this.errors = errors
   }
 }
+
+/** Disparado quando a sessão expira numa rota protegida — o AuthContext desloga o usuário. */
+export const UNAUTHORIZED_EVENT = 'auth:unauthorized'
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response
@@ -25,7 +35,10 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (res.status === 204) return undefined as T
 
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new ApiError(data.message ?? 'Erro inesperado', res.status)
+  if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+    throw new ApiError(data.message ?? 'Erro inesperado', res.status, data.errors ?? [])
+  }
   return data as T
 }
 
@@ -59,4 +72,858 @@ export const authApi = {
     }),
   me: () => api<{ user: User }>('/auth/me'),
   logout: () => api<void>('/auth/logout', { method: 'POST' }),
+}
+
+// ---------------------------------------------------------------------------
+// Hóspedes
+// ---------------------------------------------------------------------------
+
+export type PersonType = 'PF' | 'PJ'
+export type DocumentType = 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ'
+
+/** Dados enviados no cadastro/edição. Campos opcionais vão como string vazia. */
+export interface GuestInput {
+  fullName: string
+  personType: PersonType
+  isForeign: boolean
+  nationality: string
+  documentType: DocumentType
+  documentNumber: string
+  rg: string
+  email: string
+  phone: string
+  addressZip: string
+  addressStreet: string
+  addressNumber: string
+  addressComplement: string
+  addressDistrict: string
+  addressCity: string
+  addressState: string
+  addressCountry: string
+  notes: string
+}
+
+/** Campos opcionais que a API devolve como null quando vazios. */
+type OptionalGuestField =
+  | 'rg'
+  | 'email'
+  | 'addressZip'
+  | 'addressStreet'
+  | 'addressNumber'
+  | 'addressComplement'
+  | 'addressDistrict'
+  | 'addressCity'
+  | 'addressState'
+  | 'addressCountry'
+  | 'notes'
+
+export type Guest = Omit<GuestInput, OptionalGuestField> & {
+  [K in OptionalGuestField]: string | null
+} & {
+  id: string
+  hasDocumentPhoto: boolean
+  documentPhotoMime: string | null
+  createdAt: string
+  updatedAt: string
+  createdByName: string | null
+  updatedByName: string | null
+  averageRating: number | null // média das avaliações internas (null = sem avaliações)
+  reviewsCount: number
+  blocked: GuestBlock | null // bloqueio (null = não bloqueado)
+}
+
+/** Dados do bloqueio de um hóspede. */
+export interface GuestBlock {
+  reason: string
+  blockedAt: string
+  blockedByName: string | null
+  reservationId: string | null // reserva que motivou o bloqueio
+  reservationNumber: string | null
+}
+
+export interface Paginated<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface GuestListParams {
+  search?: string
+  personType?: PersonType
+  page?: number
+  pageSize?: number
+}
+
+/** Baixa um arquivo protegido (com o cookie de sessão) e devolve como Blob. */
+export async function fetchBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}/api${path}`, { credentials: 'include', signal })
+  } catch (err) {
+    if (signal?.aborted) throw err
+    throw new ApiError('Não foi possível conectar ao servidor', 0)
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+    throw new ApiError(data.message ?? 'Erro ao baixar o arquivo', res.status)
+  }
+  return res.blob()
+}
+
+export const guestsApi = {
+  list: (params: GuestListParams = {}, signal?: AbortSignal) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    })
+    return api<Paginated<Guest>>(`/guests?${qs}`, { signal })
+  },
+  get: (id: string) => api<{ guest: Guest }>(`/guests/${id}`),
+  checkDocument: (documentType: DocumentType, documentNumber: string, signal?: AbortSignal) =>
+    api<{ exists: boolean; guest: Guest | null }>(
+      `/guests/check-document?${new URLSearchParams({ documentType, documentNumber })}`,
+      { signal },
+    ),
+  create: (input: GuestInput) =>
+    api<{ guest: Guest }>('/guests', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: GuestInput) =>
+    api<{ guest: Guest }>(`/guests/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  /** Foto do documento: o corpo da requisição é o próprio arquivo. */
+  uploadDocumentPhoto: (id: string, file: File) =>
+    api<{ guest: Guest }>(`/guests/${id}/document-photo`, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': file.type },
+    }),
+  removeDocumentPhoto: (id: string) => api<{ guest: Guest }>(`/guests/${id}/document-photo`, { method: 'DELETE' }),
+  getDocumentPhoto: (id: string, signal?: AbortSignal) => fetchBlob(`/guests/${id}/document-photo`, signal),
+
+  /** Histórico de hospedagens (como responsável ou acompanhante). */
+  stays: (id: string, signal?: AbortSignal) => api<GuestStays>(`/guests/${id}/stays`, { signal }),
+
+  /** Dependentes: acompanhantes das reservas em que ele foi o responsável. */
+  dependents: (id: string, signal?: AbortSignal) => api<{ data: Dependent[] }>(`/guests/${id}/dependents`, { signal }),
+
+  /** Consulta um documento qualquer: hóspede cadastrado com ele e de quem já foi dependente. */
+  documentLookup: (document: string, excludeMainGuestId?: string | null, signal?: AbortSignal) => {
+    const qs = new URLSearchParams({ document })
+    if (excludeMainGuestId) qs.set('excludeMainGuestId', excludeMainGuestId)
+    return api<DocumentLookup>(`/guests/document-lookup?${qs}`, { signal })
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Dependentes (acompanhantes salvos no cadastro do hóspede responsável)
+// ---------------------------------------------------------------------------
+
+export interface Dependent {
+  id: string
+  fullName: string
+  document: string | null // como foi digitado na reserva
+  ageGroup: AgeGroup
+  staysCount: number // hospedagens junto com o responsável
+  lastCheckIn: string | null
+  createdAt: string
+  updatedAt: string
+  /** Preenchido quando o dependente também tem cadastro completo de hóspede. */
+  registeredGuest: { id: string; documentType: DocumentType; blocked: boolean } | null
+}
+
+/** Responsável de quem o documento consultado já foi dependente. */
+export interface DependentOf {
+  dependentId: string
+  dependentName: string
+  updatedAt: string
+  mainGuest: MainGuest & { blocked: GuestBlock | null }
+}
+
+export interface DocumentLookup {
+  guest: Guest | null // hóspede cadastrado com este documento
+  dependentOf: DependentOf[] // bloqueados primeiro
+}
+
+// ---------------------------------------------------------------------------
+// Reservas
+// ---------------------------------------------------------------------------
+
+export type ReservationStatus = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO'
+export type CommissionType = 'PERCENT' | 'VALUE'
+export type AgeGroup = 'ADULT' | 'CHILD'
+export type Platform = 'AIRBNB' | 'BOOKING' | 'VRBO' | 'DIRETO' | 'OUTRA'
+export type PaymentMethod =
+  | 'PLATAFORMA'
+  | 'PIX'
+  | 'CARTAO_CREDITO'
+  | 'CARTAO_DEBITO'
+  | 'DINHEIRO'
+  | 'TRANSFERENCIA'
+  | 'BOLETO'
+  | 'OUTRO'
+export type AttachmentCategory = 'CONTRATO' | 'CHECKIN' | 'CHECKOUT' | 'OUTRO'
+
+/** Custo/taxa descontado do valor bruto (faxina, limpeza, reposição...). */
+export interface ReservationCost {
+  id?: string
+  description: string
+  amountCents: number
+}
+
+export type ExtensionChannel = 'PLATAFORMA' | 'DIRETO'
+
+/** Dados de uma extensão enviados no formulário (o back calcula noites, valor e comissão). */
+export interface ReservationExtensionInput {
+  checkOut: string // novo check-out
+  channel: ExtensionChannel
+  amountCents?: number // só para DIRETO
+  paymentMethod?: PaymentMethod | null // só para DIRETO
+}
+
+export interface ReservationExtension {
+  id: string
+  startDate: string
+  checkOut: string
+  nights: number
+  channel: ExtensionChannel
+  paymentMethod: PaymentMethod | null
+  amountCents: number
+  commissionCents: number
+}
+
+export interface ReservationAttachment {
+  id: string
+  category: AttachmentCategory
+  fileName: string
+  mime: string
+  sizeBytes: number
+  createdAt: string
+  createdByName: string | null
+}
+
+export interface Companion {
+  id?: string
+  fullName: string
+  document: string | null
+  ageGroup: AgeGroup
+}
+
+export interface ReservationInput {
+  reservationNumber: string
+  mainGuestId: string
+  propertyName: string
+  guestsCount: number
+  companions: Companion[]
+  bookedAt: string // AAAA-MM-DD
+  checkIn: string
+  checkOut: string
+  status: ReservationStatus
+  platform: Platform
+  paymentMethod: PaymentMethod | null
+  costs: ReservationCost[]
+  extensions: ReservationExtensionInput[]
+  amountCents: number
+  commissionType: CommissionType
+  commissionRate?: number | null
+  commissionCents?: number
+}
+
+export interface MainGuest {
+  id: string
+  fullName: string
+  documentType: DocumentType
+  documentNumber: string
+}
+
+export interface Reservation {
+  id: string
+  reservationNumber: string
+  mainGuest: MainGuest
+  propertyName: string
+  guestsCount: number
+  companionsCount: number
+  bookedAt: string
+  checkIn: string
+  checkOut: string // check-out original
+  finalCheckOut: string // com as extensões
+  nights: number // noites da reserva original
+  totalNights: number // com as extensões
+  status: ReservationStatus
+  platform: Platform | null // null só em reservas antigas
+  paymentMethod: PaymentMethod | null
+  amountCents: number
+  commissionType: CommissionType
+  commissionRate: number | null
+  commissionCents: number
+  costsCents: number
+  extensionsCents: number
+  extensionsCommissionCents: number
+  extensionsCount: number
+  /** Valor bruto = reserva + extensões */
+  grossCents: number
+  /** Total geral = bruto − comissões − custos */
+  netCents: number
+  attachmentsCount: number
+  createdAt: string
+  updatedAt: string
+  createdByName: string | null
+  updatedByName: string | null
+  // só no detalhe
+  companions?: Companion[]
+  costs?: ReservationCost[]
+  extensions?: ReservationExtension[]
+  attachments?: ReservationAttachment[]
+}
+
+export interface ReservationList extends Paginated<Reservation> {
+  totals: { amountCents: number; commissionCents: number; costsCents: number; netCents: number }
+}
+
+export interface ReservationListParams {
+  search?: string
+  status?: ReservationStatus
+  page?: number
+  pageSize?: number
+}
+
+export const reservationsApi = {
+  list: (params: ReservationListParams = {}, signal?: AbortSignal) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    })
+    return api<ReservationList>(`/reservations?${qs}`, { signal })
+  },
+  get: (id: string) => api<{ reservation: Reservation }>(`/reservations/${id}`),
+  create: (input: ReservationInput) =>
+    api<{ reservation: Reservation }>('/reservations', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: ReservationInput) =>
+    api<{ reservation: Reservation }>(`/reservations/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  /** Anexos: o corpo da requisição é o próprio arquivo. */
+  addAttachment: (id: string, file: File, category: AttachmentCategory) =>
+    api<{ attachment: ReservationAttachment }>(
+      `/reservations/${id}/attachments?${new URLSearchParams({ category, name: file.name })}`,
+      { method: 'POST', body: file, headers: { 'Content-Type': file.type } },
+    ),
+  removeAttachment: (id: string, attachmentId: string) =>
+    api<void>(`/reservations/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  getAttachment: (id: string, attachmentId: string, signal?: AbortSignal) =>
+    fetchBlob(`/reservations/${id}/attachments/${attachmentId}`, signal),
+}
+
+// ---------------------------------------------------------------------------
+// Histórico de hospedagens do hóspede
+// ---------------------------------------------------------------------------
+
+/** Papel do hóspede na reserva: responsável ou acompanhante (encontrado pelo documento). */
+export type GuestRole = 'RESPONSAVEL' | 'ACOMPANHANTE'
+
+export type GuestStay = Reservation & {
+  guestRole: GuestRole
+  reviewAverage: number | null // média da avaliação interna (null = não avaliada)
+}
+
+export interface GuestStays {
+  data: GuestStay[]
+  summary: {
+    totalReservations: number // todas, inclusive futuras
+    totalStays: number // já iniciadas (check-in até hoje)
+    asMainCount: number
+    asCompanionCount: number
+    totalNights: number // das já iniciadas
+    grossCents: number // só como responsável, das já iniciadas
+    firstCheckIn: string | null
+    lastCheckIn: string | null
+    nextCheckIn: string | null
+    averageRating: number | null // média das avaliações como responsável
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avaliações internas das hospedagens (uma por reserva)
+// ---------------------------------------------------------------------------
+
+export interface ReviewInput {
+  cleanlinessRating: number // 1 a 5
+  communicationRating: number
+  rulesRating: number
+  notes: string
+  blockGuest?: boolean // bloqueia o hóspede responsável
+  blockReason?: string
+}
+
+export interface Review {
+  id: string
+  cleanlinessRating: number
+  communicationRating: number
+  rulesRating: number
+  average: number
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  createdByName: string | null
+  updatedByName: string | null
+}
+
+/** Reserva + hóspede + avaliação (null quando ainda não avaliada). */
+export interface ReviewItem {
+  reservation: {
+    id: string
+    reservationNumber: string
+    propertyName: string
+    checkIn: string
+    finalCheckOut: string
+    totalNights: number
+    status: ReservationStatus
+    platform: Platform | null
+    guestsCount: number
+  }
+  guest: {
+    id: string
+    fullName: string
+    documentType: DocumentType
+    documentNumber: string
+    averageRating: number | null // média do hóspede em todas as reservas avaliadas
+    reviewsCount: number
+    blocked: GuestBlock | null
+  }
+  review: Review | null
+}
+
+export type ReviewFilter = 'PENDENTE' | 'AVALIADA'
+
+export interface ReviewList extends Paginated<ReviewItem> {
+  counts: { all: number; reviewed: number; pending: number; averageRating: number | null }
+}
+
+export interface ReviewListParams {
+  search?: string
+  reviewed?: ReviewFilter
+  page?: number
+  pageSize?: number
+}
+
+export const reviewsApi = {
+  list: (params: ReviewListParams = {}, signal?: AbortSignal) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    })
+    return api<ReviewList>(`/reviews?${qs}`, { signal })
+  },
+  get: (reservationId: string) => api<{ item: ReviewItem }>(`/reviews/${reservationId}`),
+  save: (reservationId: string, input: ReviewInput) =>
+    api<{ item: ReviewItem }>(`/reviews/${reservationId}`, { method: 'PUT', body: JSON.stringify(input) }),
+  remove: (reservationId: string) => api<void>(`/reviews/${reservationId}`, { method: 'DELETE' }),
+}
+
+// ---------------------------------------------------------------------------
+// Hóspedes bloqueados
+// ---------------------------------------------------------------------------
+
+export interface BlockEntry {
+  guest: {
+    id: string
+    fullName: string
+    documentType: DocumentType
+    documentNumber: string
+    phone: string
+    email: string | null
+    averageRating: number | null
+    reviewsCount: number
+  }
+  reason: string
+  reservationId: string | null
+  reservationNumber: string | null
+  blockedAt: string
+  blockedByName: string | null
+  updatedAt: string
+  updatedByName: string | null
+}
+
+/** Avaliação de uma hospedagem do hóspede bloqueado. */
+export interface BlockReview {
+  reservationId: string
+  reservationNumber: string
+  propertyName: string
+  checkIn: string
+  finalCheckOut: string
+  cleanlinessRating: number
+  communicationRating: number
+  rulesRating: number
+  average: number
+  notes: string | null
+  updatedAt: string
+  reviewedByName: string | null
+  isBlockOrigin: boolean // reserva que motivou o bloqueio
+}
+
+export interface BlockDetail {
+  block: BlockEntry
+  reviews: BlockReview[]
+}
+
+export const blocklistApi = {
+  list: (params: { search?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    })
+    return api<Paginated<BlockEntry>>(`/blocklist?${qs}`, { signal })
+  },
+  get: (guestId: string, signal?: AbortSignal) => api<BlockDetail>(`/blocklist/${guestId}`, { signal }),
+  block: (guestId: string, reason: string, reservationId?: string | null) =>
+    api<BlockDetail>(`/blocklist/${guestId}`, { method: 'PUT', body: JSON.stringify({ reason, reservationId }) }),
+  unblock: (guestId: string) => api<void>(`/blocklist/${guestId}`, { method: 'DELETE' }),
+}
+
+// ---------------------------------------------------------------------------
+// Finanças — Relatório financeiro (proporcional às noites) e Fechamento do mês (caixa)
+// ---------------------------------------------------------------------------
+
+interface FinanceAmounts {
+  reservations: number
+  nights: number
+  grossCents: number
+  commissionCents: number
+  costsCents: number
+  netCents: number
+}
+
+/** Hospedagem com os valores que caem no mês (proporcionais às noites). */
+export interface FinanceStay {
+  id: string
+  reservationNumber: string
+  propertyName: string
+  mainGuest: { id: string; fullName: string }
+  platform: Platform | null
+  status: ReservationStatus
+  checkIn: string
+  finalCheckOut: string
+  totalNights: number
+  nightsInMonth: number // noites dormidas no mês (ocupação)
+  totalDays: number // dias da hospedagem, check-in e check-out inclusive
+  daysInMonth: number // dias que caem no mês (base da divisão dos valores)
+  partial: boolean // atravessa a virada do mês
+  grossCents: number
+  extensionsCents: number
+  commissionCents: number
+  costsCents: number
+  netCents: number
+  fullGrossCents: number // hospedagem inteira
+  fullNetCents: number
+}
+
+/** Categorias das despesas do imóvel (condomínio, IPTU, contas...). */
+export type ExpenseCategory =
+  | 'CONDOMINIO'
+  | 'IPTU'
+  | 'ENERGIA'
+  | 'AGUA'
+  | 'GAS'
+  | 'INTERNET'
+  | 'TV_STREAMING'
+  | 'SEGURO'
+  | 'ALUGUEL'
+  | 'FINANCIAMENTO'
+  | 'ADMINISTRACAO'
+  | 'MANUTENCAO'
+  | 'IMPOSTOS'
+  | 'OUTRO'
+
+/** Despesa lançada no mês (avulsa ou gerada por uma recorrente). */
+export interface MonthExpense {
+  id: string
+  period: string // AAAA-MM-01
+  propertyName: string | null // null = geral (não é de um imóvel só)
+  category: ExpenseCategory
+  description: string
+  amountCents: number
+  recurring: { id: string; amountCents: number; startMonth: string; endMonth: string | null } | null
+  edited: boolean // valor/dados alterados só neste mês
+  updatedAt: string
+  updatedByName: string | null
+}
+
+export interface ExpenseInput {
+  propertyName: string | null
+  category: ExpenseCategory
+  description: string
+  amountCents: number
+}
+
+export interface FinanceMonth {
+  period: { year: number; month: number; start: string; end: string; days: number }
+  totals: FinanceAmounts & {
+    days: number // dias no mês (check-in e check-out contam)
+    extensionsCents: number
+    averageDailyCents: number
+  }
+  byProperty: (FinanceAmounts & { propertyName: string; occupancy: number })[]
+  byPlatform: (FinanceAmounts & { platform: Platform | null; days: number })[]
+  data: FinanceStay[]
+  previous: {
+    year: number
+    month: number
+    reservations: number
+    nights: number
+    grossCents: number
+    netCents: number
+  }
+}
+
+/** Configuração do fechamento (vale a partir do mês salvo até mudar). */
+export interface ClosingSettings {
+  adminFee: {
+    enabled: boolean
+    percent: number
+    base: 'GROSS' | 'NET' // GROSS = sobre o bruto | NET = sobre o resultado do relatório
+  }
+  tax: {
+    enabled: boolean
+    incomeBase: 'GROSS' | 'PAYOUT' // PAYOUT = bruto − comissão (valor repassado)
+    deductionMode: 'AUTO' | 'LEGAL' | 'SIMPLIFIED'
+    dependents: number
+    socialSecurityCents: number
+    alimonyCents: number
+  }
+}
+
+/** Dados comuns das hospedagens do fechamento. */
+interface ClosingStayBase {
+  id: string
+  reservationNumber: string
+  propertyName: string
+  mainGuest: { id: string; fullName: string }
+  platform: Platform | null
+  status: ReservationStatus
+  checkIn: string
+  finalCheckOut: string
+  nights: number
+}
+
+/** Valor da locação recebido no mês (hospedagem inteira, check-out no mês anterior). */
+export interface ClosingStay extends ClosingStayBase {
+  grossCents: number
+  extensionsCents: number
+  commissionCents: number
+  netCents: number // bruto − comissão (o que cai na conta)
+}
+
+/** Custos pagos no mês (hospedagem com check-out final neste mês). */
+export interface ClosingCostStay extends ClosingStayBase {
+  costsCents: number
+}
+
+export interface CarneLeao {
+  incomeCents: number
+  rentalDeductionsCents: number
+  deductibleExpensesCents: number
+  adminFeeDeductionCents: number
+  deductibleExpenses: { id: string; category: ExpenseCategory; description: string; propertyName: string | null; amountCents: number }[]
+  taxableIncomeCents: number
+  deductionUsed: 'LEGAL' | 'SIMPLIFIED'
+  legalDeductionsCents: number
+  simplifiedDiscountCents: number
+  personalDeductionsCents: number
+  baseCents: number
+  bracket: { index: number; rate: number; deductionCents: number }
+  tableTaxCents: number
+  reductionCents: number
+  taxCents: number
+  belowMinimum: boolean
+  effectiveRate: number
+  due: { year: number; month: number }
+}
+
+export interface ClosingMonth {
+  period: { year: number; month: number; start: string }
+  reference: { year: number; month: number; start: string; end: string } // mês dos check-outs recebidos
+  settings: ClosingSettings & {
+    source: { period: string; inherited: boolean; updatedAt: string | null; updatedByName: string | null } | null
+  }
+  totals: {
+    reservations: number // hospedagens recebidas
+    costReservations: number // hospedagens com custos no mês
+    grossCents: number
+    extensionsCents: number
+    commissionCents: number
+    costsCents: number
+    netCents: number // resultado do relatório
+    expensesCents: number
+    generalExpensesCents: number
+    adminFeeCents: number
+    beforeTaxCents: number
+    taxCents: number
+    finalCents: number // líquido final em mãos
+  }
+  tax: CarneLeao | null
+  byProperty: {
+    propertyName: string
+    reservations: number
+    grossCents: number
+    commissionCents: number
+    costsCents: number
+    netCents: number
+    expensesCents: number
+    adminFeeCents: number
+    resultCents: number
+  }[]
+  stays: ClosingStay[]
+  costStays: ClosingCostStay[]
+  expenses: MonthExpense[]
+  properties: string[]
+  previous: { year: number; month: number; grossCents: number; finalCents: number }
+}
+
+export const financeApi = {
+  month: (year: number, month: number, signal?: AbortSignal) =>
+    api<FinanceMonth>(`/finance?${new URLSearchParams({ year: String(year), month: String(month) })}`, { signal }),
+
+  /** Fechamento do mês (ponta do lápis). */
+  closing: (year: number, month: number, signal?: AbortSignal) =>
+    api<ClosingMonth>(`/finance/closing?${new URLSearchParams({ year: String(year), month: String(month) })}`, { signal }),
+  /** Salva a configuração a partir deste mês e devolve o fechamento recalculado. */
+  saveClosingSettings: (year: number, month: number, settings: ClosingSettings) =>
+    api<ClosingMonth>('/finance/closing/settings', { method: 'PUT', body: JSON.stringify({ year, month, ...settings }) }),
+
+  /** recurring = repete todo mês a partir deste. */
+  createExpense: (year: number, month: number, input: ExpenseInput & { recurring: boolean }) =>
+    api<{ expense: MonthExpense }>('/finance/expenses', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, ...input }),
+    }),
+  /** applyToFuture (recorrente) = muda também os próximos meses; senão, só este mês. */
+  updateExpense: (id: string, input: ExpenseInput & { applyToFuture: boolean }) =>
+    api<{ expense: MonthExpense }>(`/finance/expenses/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  /** scope "future" (recorrente) = para de repetir a partir deste mês. */
+  removeExpense: (id: string, scope: 'month' | 'future' = 'month') =>
+    api<void>(`/finance/expenses/${id}?scope=${scope}`, { method: 'DELETE' }),
+}
+
+// ---------------------------------------------------------------------------
+// Calendário — links iCal das plataformas (somente consulta)
+// ---------------------------------------------------------------------------
+
+export interface CalendarFeedInput {
+  name: string
+  platform: Platform
+  url: string
+  color: string
+  propertyName: string
+  active: boolean
+}
+
+export interface CalendarFeed extends Omit<CalendarFeedInput, 'propertyName'> {
+  id: string
+  propertyName: string | null
+  lastSyncAt: string | null
+  lastError: string | null
+  lastEvents: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** Situação de cada link na última sincronização. */
+export interface CalendarFeedStatus {
+  id: string
+  name: string
+  platform: Platform
+  color: string
+  propertyName: string | null
+  syncedAt: string
+  error: string | null
+  eventsCount: number
+}
+
+export interface CalendarEventDetail {
+  label: string
+  value: string
+  href?: string
+}
+
+/** Reserva do cadastro ligada ao evento (mesma plataforma e datas). */
+export interface CalendarLinkedReservation {
+  id: string
+  reservationNumber: string
+  propertyName: string
+  guestsCount: number
+  checkIn: string
+  checkOut: string
+  status: ReservationStatus
+  platform: Platform | null
+  guest: { id: string; fullName: string; phone: string | null }
+}
+
+export interface CalendarEvent {
+  id: string
+  /** Identificador da marcação dentro do link (UID do iCal) — usado no vínculo com a reserva */
+  eventKey: string
+  feedId: string
+  feedName: string
+  platform: Platform
+  color: string
+  propertyName: string | null
+  kind: 'RESERVA' | 'BLOQUEIO'
+  guestName: string | null
+  start: string // check-in (AAAA-MM-DD)
+  end: string // check-out (AAAA-MM-DD, dia de saída)
+  nights: number
+  summary: string | null
+  description: string | null
+  notes: string | null
+  location: string | null
+  url: string | null
+  uid: string | null
+  status: string | null
+  reservationCode: string | null
+  details: CalendarEventDetail[]
+  extra: Record<string, string>
+  reservation: CalendarLinkedReservation | null
+  /** MANUAL = vinculado por você | AUTO = mesmo código ou mesmas datas e plataforma */
+  linkSource: 'MANUAL' | 'AUTO' | null
+  /** datas da reserva vinculada diferentes das da plataforma */
+  datesMismatch: boolean
+  alsoIn: { feedName: string; platform: Platform; summary: string | null }[]
+}
+
+export interface CalendarData {
+  from: string
+  to: string
+  feeds: CalendarFeedStatus[]
+  events: CalendarEvent[]
+}
+
+/** Reserva sugerida para vincular a uma marcação. */
+export interface CalendarLinkCandidate extends CalendarLinkedReservation {
+  overlaps: boolean // cruza o período da marcação
+  exact: boolean // mesmas datas
+  linkedTo: string | null // nome do link ao qual já está vinculada
+}
+
+export const calendarApi = {
+  /** refresh = baixa os calendários de novo, ignorando o cache do servidor (10 min). */
+  events: (from: string, to: string, refresh = false, signal?: AbortSignal) =>
+    api<CalendarData>(`/calendar/events?${new URLSearchParams({ from, to, ...(refresh ? { refresh: '1' } : {}) })}`, {
+      signal,
+    }),
+  feeds: (signal?: AbortSignal) => api<{ data: CalendarFeed[] }>('/calendar/feeds', { signal }),
+  createFeed: (input: CalendarFeedInput) =>
+    api<{ feed: CalendarFeed }>('/calendar/feeds', { method: 'POST', body: JSON.stringify(input) }),
+  updateFeed: (id: string, input: CalendarFeedInput) =>
+    api<{ feed: CalendarFeed }>(`/calendar/feeds/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  removeFeed: (id: string) => api<void>(`/calendar/feeds/${id}`, { method: 'DELETE' }),
+
+  /** Vínculo marcação ↔ reserva do cadastro (fica só no sistema). */
+  linkCandidates: (start: string, end: string, search = '', signal?: AbortSignal) =>
+    api<{ data: CalendarLinkCandidate[] }>(
+      `/calendar/link-candidates?${new URLSearchParams({ start, end, ...(search ? { search } : {}) })}`,
+      { signal },
+    ),
+  link: (feedId: string, eventKey: string, reservationId: string) =>
+    api<void>('/calendar/links', { method: 'PUT', body: JSON.stringify({ feedId, eventKey, reservationId }) }),
+  unlink: (feedId: string, eventKey: string) =>
+    api<void>('/calendar/links', { method: 'DELETE', body: JSON.stringify({ feedId, eventKey }) }),
 }

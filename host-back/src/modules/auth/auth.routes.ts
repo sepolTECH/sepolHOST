@@ -2,6 +2,7 @@ import { Router, type CookieOptions } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
+import { AppError } from '../../utils/AppError.js';
 import { AUTH_COOKIE, ensureAuth } from '../../middlewares/auth.js';
 import { durationToMs } from '../../utils/jwt.js';
 import * as authService from './auth.service.js';
@@ -89,7 +90,13 @@ authRoutes.post('/login', loginLimiter, async (req, res) => {
   res.json({ user });
 });
 
+// Informa ao front se o cadastro de novos clientes está aberto
+authRoutes.get('/config', (_req, res) => {
+  res.json({ registrationOpen: env.ALLOW_REGISTRATION });
+});
+
 authRoutes.post('/register', registerLimiter, async (req, res) => {
+  if (!env.ALLOW_REGISTRATION) throw new AppError('O cadastro de novos usuários está desativado', 403);
   const { name, email, password } = registerSchema.parse(req.body);
   const { token, user } = await authService.register(name, email, password);
   res.cookie(AUTH_COOKIE, token, cookieOptions(false));

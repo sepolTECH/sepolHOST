@@ -1,0 +1,294 @@
+/* ---------- Página de avaliações ---------- */
+.kpis--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.kpi__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kpi__rating svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.panel__filter.panel__filter--reviews {
+  width: 440px;
+}
+.table--reviews .table__actions-col {
+  width: 56px;
+}
+.review-pending {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  white-space: nowrap;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+}
+
+/* ---------- Formulário de avaliação ---------- */
+.review-guest-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Bloqueio do hóspede dentro do formulário */
+.review-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.review-block.is-on {
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.review-block__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+.review-block__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.review-block__text strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.review-block__text strong svg {
+  width: 16px;
+  height: 16px;
+}
+.review-block.is-on .review-block__text strong {
+  color: var(--danger);
+}
+.review-block__text small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.review-block__reason-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-block__reason-head label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.review-block__copy {
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+/* Interruptor (checkbox estilizado) */
+.review-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  cursor: pointer;
+  background: var(--gray-200);
+  border-radius: 999px;
+  outline: none;
+  appearance: none;
+  transition: background 0.2s ease;
+}
+.review-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.review-switch:checked {
+  background: var(--danger);
+}
+.review-switch:checked::after {
+  transform: translateX(16px);
+}
+.review-switch:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.review-switch:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.review-form__context {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.review-form__context > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.review-form__context span:first-child {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.review-form__context strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-form__context small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.review-form__ratings {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.review-form__rating {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+.review-form__rating:hover {
+  background: var(--gray-50);
+}
+.review-form__rating.has-error {
+  background: color-mix(in srgb, var(--danger) 5%, transparent);
+}
+.review-form__rating-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.review-form__rating-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.review-form__rating-text .req {
+  color: var(--danger);
+}
+.review-form__rating-text small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.review-form__average {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--gray-50);
+}
+.review-form__average > span:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.review-form__average small {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.review-form__notes-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-form__notes-foot small {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-variant-numeric: tabular-nums;
+}
+.review-form__error {
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-radius: 10px;
+}
+/* Excluir fica à esquerda no rodapé; 2º clique confirma */
+.review-form__delete {
+  margin-right: auto;
+  color: var(--danger);
+}
+.review-form__delete.is-confirming {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+@media (max-width: 1100px) {
+  .kpis--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kpis--4 .kpi--dark {
+    grid-column: auto;
+  }
+}
+@media (max-width: 720px) {
+  .panel__filter.panel__filter--reviews {
+    width: 100%;
+  }
+  .review-form__context {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .review-form__rating {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

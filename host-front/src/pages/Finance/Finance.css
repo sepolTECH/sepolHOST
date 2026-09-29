@@ -1,0 +1,610 @@
+/* =========================================================
+   Finanças  (reaproveita Guests.css e Reservations.css)
+   ========================================================= */
+
+/* ---------- Seletor de mês ---------- */
+.month-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.month-picker .ui-input {
+  height: 40px;
+}
+.month-picker__month {
+  width: 150px;
+}
+.month-picker__year {
+  width: 100px;
+}
+
+.finance__loading {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+}
+.finance__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.2s;
+}
+.finance__body.is-refreshing {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.finance__body > .kpis {
+  margin-bottom: 0;
+}
+.finance__error {
+  margin: 0;
+}
+.finance__link {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+/* ---------- Indicadores: dicas e variação ---------- */
+.kpi__hint {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.kpi--dark .kpi__hint {
+  color: color-mix(in srgb, var(--on-text) 65%, transparent);
+}
+.kpi__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.kpi__trend svg {
+  width: 14px;
+  height: 14px;
+}
+.kpi__trend.is-up {
+  color: #2e7d32;
+}
+.kpi__trend.is-down {
+  color: var(--danger);
+}
+/* no cartão escuro, a cor vem só do ícone/sinal para manter o contraste */
+.kpi__trend.is-dark {
+  color: color-mix(in srgb, var(--on-text) 80%, transparent);
+}
+:root[data-theme='dark'] .kpi__trend.is-up:not(.is-dark) {
+  color: #81c784;
+}
+
+/* ---------- Mini indicadores ---------- */
+.finance__minis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  animation: fade-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.finance__minis > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  background: var(--surface);
+}
+.finance__minis span {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.finance__minis strong {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Painéis ---------- */
+.finance__split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.finance__panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+.finance__panel-title small {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border-radius: 999px;
+}
+.finance__name {
+  font-weight: 600;
+}
+.table--finance-mini td,
+.table--finance-mini th {
+  padding: 10px 14px;
+}
+/* a regra global esconde a 3ª coluna em telas médias; aqui ela é importante */
+.table--finance-mini th:nth-child(3),
+.table--finance-mini td:nth-child(3),
+.table--finance th:nth-child(3),
+.table--finance td:nth-child(3) {
+  display: table-cell;
+}
+.table--finance th,
+.table--finance td {
+  padding-right: 12px;
+  padding-left: 12px;
+}
+.table--finance th:first-child,
+.table--finance td:first-child {
+  padding-left: 16px;
+}
+.table--finance th:last-child,
+.table--finance td:last-child {
+  padding-right: 16px;
+}
+.table--finance-mini .num,
+.table--finance .num,
+.finance__name {
+  white-space: nowrap;
+}
+
+/* Barra de ocupação */
+.occupancy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.occupancy__bar {
+  position: relative;
+  width: 70px;
+  height: 6px;
+  overflow: hidden;
+  background: var(--gray-100);
+  border-radius: 999px;
+}
+.occupancy__bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--text);
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.occupancy__value {
+  min-width: 34px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hospedagens do mês */
+.finance__partial {
+  display: inline-flex;
+  padding: 0 6px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--gray-100);
+  border-radius: 999px;
+  cursor: help;
+}
+.finance__minus {
+  color: var(--gray-500);
+}
+.table--finance tfoot td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-weight: 700;
+  background: var(--gray-50);
+  border-top: 1px solid var(--border-strong);
+}
+.table--finance tfoot td:last-child {
+  color: var(--text);
+}
+
+.finance__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--gray-500);
+}
+.finance__note svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+}
+
+
+/* ---------- 6 indicadores ---------- */
+.kpis.finance__kpis {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.finance__kpis .kpi strong {
+  font-size: 18px;
+}
+.kpi--dark.is-negative strong {
+  color: #ff8a80; /* cartão escuro no tema claro */
+}
+:root[data-theme='dark'] .kpi--dark.is-negative strong {
+  color: #c62828; /* cartão claro no tema escuro */
+}
+/* Relatório: 5 cartões */
+.kpis.finance__kpis--5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+/* 6 cartões: o escuro não ocupa a linha inteira (regra de Reservations.css) */
+.finance__kpis .kpi--dark {
+  grid-column: auto !important;
+}
+
+/* ---------- Fórmula do resultado ---------- */
+.finance__formula {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  animation: fade-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.finance__formula > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.finance__formula small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+.finance__formula b {
+  font-size: 16px;
+  color: var(--gray-400);
+}
+.finance__formula-result {
+  padding: 4px 10px;
+  color: var(--on-text);
+  background: var(--text);
+  border-radius: 8px;
+}
+.finance__formula-result small {
+  color: color-mix(in srgb, var(--on-text) 65%, transparent);
+}
+.finance__formula-result.is-negative {
+  background: var(--danger);
+}
+.finance__negative {
+  color: var(--danger) !important;
+}
+
+/* ---------- Resultado por imóvel ---------- */
+.table--finance-props th,
+.table--finance-props td {
+  padding-right: 12px;
+  padding-left: 12px;
+}
+.table--finance-props th:first-child,
+.table--finance-props td:first-child {
+  padding-left: 16px;
+}
+.table--finance-props th:last-child,
+.table--finance-props td:last-child {
+  padding-right: 16px;
+}
+.table--finance-props th:nth-child(3),
+.table--finance-props td:nth-child(3) {
+  display: table-cell;
+}
+.table--finance-props .num {
+  white-space: nowrap;
+}
+.table--finance-props tfoot td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 13px;
+  color: var(--gray-600);
+  background: var(--gray-50);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- Painel de despesas ---------- */
+.finance__panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.finance__panel-head .finance__panel-title {
+  flex: 1;
+  border-bottom: 0;
+}
+.finance__panel-total {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.finance__expenses-empty {
+  padding: 36px 16px;
+}
+.finance__expenses-empty small {
+  display: inline-block;
+  max-width: 520px;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.expenses {
+  display: flex;
+  flex-direction: column;
+}
+.expenses__group + .expenses__group {
+  border-top: 1px solid var(--border);
+}
+.expenses__group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--border);
+}
+.expenses__group-head strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+.expenses__group-head small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.expenses__group-total {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.expenses__group-head .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.expenses__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.expense {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  animation: fade-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.expense + .expense {
+  border-top: 1px solid var(--border);
+}
+.expense__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border-radius: 10px;
+}
+.expense__icon svg {
+  width: 17px;
+  height: 17px;
+}
+.expense__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.expense__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.expense__title strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.expense__main small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.expense__title .ui-badge {
+  white-space: nowrap;
+}
+.expense__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.expense__badge svg {
+  width: 11px;
+  height: 11px;
+}
+.expense__amount {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.expense__actions {
+  display: flex;
+  gap: 2px;
+}
+.expense__delete:hover {
+  color: var(--danger);
+}
+.expense-delete p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.expense-delete ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--gray-600);
+}
+.expense-form__label-icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+.expense-form .ui-select {
+  width: 100%;
+}
+
+@media (max-width: 1360px) {
+  .kpis.finance__kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 1360px) {
+  .finance__split {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 1100px) {
+  .finance__minis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* na tabela principal, esconde comissão e custos (ficam no rodapé e nos totais) */
+  .table--finance th:nth-child(6),
+  .table--finance td:nth-child(6),
+  .table--finance th:nth-child(7),
+  .table--finance td:nth-child(7) {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .kpis.finance__kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finance__formula {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+  .finance__formula > span {
+    flex-direction: row;
+    justify-content: space-between;
+    grid-column: 1 / -1;
+  }
+  .finance__formula b {
+    display: none;
+  }
+  .finance__panel-head {
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+  }
+  .finance__panel-head .ui-btn {
+    width: 100%;
+    margin-left: 16px;
+  }
+  .expense {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .expense__main {
+    flex: 1 1 calc(100% - 46px);
+  }
+  .expense__amount {
+    margin-right: auto;
+    margin-left: 46px;
+  }
+  .table--finance-props td:nth-child(3) {
+    display: flex;
+  }
+  .table--finance-props td:first-child .doc-cell {
+    align-items: flex-start;
+  }
+  .table--finance-props tfoot {
+    display: block;
+  }
+  .table--finance-props tfoot td:first-child {
+    padding-left: 0;
+    text-align: left;
+  }
+  .month-picker {
+    width: 100%;
+  }
+  .month-picker__month {
+    flex: 1;
+    width: auto;
+  }
+  .table--finance td:nth-child(3),
+  .table--finance td:nth-child(6),
+  .table--finance td:nth-child(7),
+  .table--finance-mini td:nth-child(3) {
+    display: flex;
+  }
+  .table--finance tfoot {
+    display: block;
+  }
+  .table--finance tfoot td {
+    background: none;
+    border: 0;
+  }
+  .table--finance tfoot tr {
+    background: var(--gray-50);
+  }
+  .table--finance-mini td:first-child,
+  .table--finance td:first-child {
+    padding-right: 0;
+  }
+  /* título do cartão alinhado à esquerda */
+  .table--finance-mini td:first-child .doc-cell,
+  .table--finance td:first-child .doc-cell {
+    align-items: flex-start;
+  }
+  .table--finance tfoot td:first-child {
+    padding-left: 0;
+    text-align: left;
+  }
+}

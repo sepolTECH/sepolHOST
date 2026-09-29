@@ -1,0 +1,108 @@
+/* ---------- Estrelas (seleção) ---------- */
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.stars__star {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--gray-400);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    color 0.15s ease,
+    transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.stars__star svg {
+  width: 22px;
+  height: 22px;
+  fill: transparent;
+  transition: fill 0.15s ease;
+}
+.stars--lg .stars__star {
+  width: 38px;
+  height: 38px;
+}
+.stars--lg .stars__star svg {
+  width: 28px;
+  height: 28px;
+}
+.stars__star.is-on {
+  color: var(--text);
+}
+.stars__star.is-on svg {
+  fill: currentColor;
+}
+/* pré-visualização (hover) um tom mais claro que a nota escolhida */
+.stars__star.is-preview {
+  color: var(--gray-600);
+}
+.stars__star:hover:not(:disabled) {
+  transform: scale(1.12);
+}
+.stars__star:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.stars__star:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.stars__star:disabled {
+  cursor: default;
+}
+.stars__label {
+  min-width: 70px;
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+.stars.is-invalid .stars__star {
+  color: color-mix(in srgb, var(--danger) 55%, var(--gray-400));
+}
+
+/* ---------- Estrelas (somente leitura, aceita fração) ---------- */
+.stars-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.stars-display__track {
+  position: relative;
+  display: inline-flex;
+}
+.stars-display__row {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--gray-400);
+}
+.stars-display__row--fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  color: var(--text);
+}
+.stars-display__row svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+.stars-display__row--fill svg {
+  fill: currentColor;
+}
+.stars-display--md .stars-display__row svg {
+  width: 18px;
+  height: 18px;
+}
+.stars-display__value {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

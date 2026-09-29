@@ -10,7 +10,9 @@
     "migrate": "tsx src/db/migrate.ts",
     "migrate:prod": "node dist/db/migrate.js",
     "seed": "tsx src/db/seed.ts",
-    "seed:prod": "node dist/db/seed.js"
+    "seed:prod": "node dist/db/seed.js",
+    "user:create": "tsx src/db/createUser.ts",
+    "user:create:prod": "node dist/db/createUser.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

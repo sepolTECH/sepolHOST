@@ -1,16 +1,24 @@
 :root {
-  /* Paleta: branco, preto e cinzas */
+  /* Paleta clara: branco, preto e cinzas */
   --bg: #fafafa;
   --surface: #ffffff;
   --text: #171717;
+  --text-strong: #000000;
+  /* texto/ícone sobre fundo "invertido" (ex.: botão preto) */
+  --on-text: #ffffff;
   --gray-50: #f7f7f7;
   --gray-100: #f0f0f0;
+  --gray-200: #e5e5e5;
   --gray-400: #a3a3a3;
   --gray-500: #737373;
   --gray-600: #525252;
   --gray-700: #404040;
   --border: #e8e8e8;
   --border-strong: #d9d9d9;
+  --ring: rgba(0, 0, 0, 0.08);
+  --shadow: rgba(0, 0, 0, 0.08);
+  --overlay: rgba(10, 10, 10, 0.45);
+  --danger: #c62828;
 
   --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
 
@@ -24,6 +32,42 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Paleta escura — ativada por <html data-theme="dark"> (ThemeContext) */
+:root[data-theme='dark'] {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --text: #ededed;
+  --text-strong: #ffffff;
+  --on-text: #0a0a0a;
+  --gray-50: #1b1b1b;
+  --gray-100: #232323;
+  --gray-200: #2c2c2c;
+  --gray-400: #6b6b6b;
+  --gray-500: #8f8f8f;
+  --gray-600: #a8a8a8;
+  --gray-700: #c7c7c7;
+  --border: #242424;
+  --border-strong: #333333;
+  --ring: rgba(255, 255, 255, 0.12);
+  --shadow: rgba(0, 0, 0, 0.6);
+  --overlay: rgba(0, 0, 0, 0.65);
+  --danger: #f07167;
+  color-scheme: dark;
+}
+
+/* transição suave ao trocar de tema (a classe é aplicada só durante a troca) */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    fill 0.3s ease,
+    stroke 0.3s ease !important;
 }
 
 *,
@@ -44,7 +88,7 @@ body {
 
 ::selection {
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
 }
 
 /* ---------- Utilitários globais ---------- */
@@ -62,8 +106,8 @@ body {
 .spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--on-text) 30%, transparent);
+  border-top-color: var(--on-text);
   border-radius: 50%;
   animation: spinner 0.7s linear infinite;
 }
@@ -83,4 +127,67 @@ body {
   min-height: 100svh;
   display: grid;
   place-items: center;
+}
+
+/* ---------- Botão de tema (sol/lua) ---------- */
+.theme-toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--gray-600);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.theme-toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -10px var(--shadow);
+}
+.theme-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.theme-toggle svg {
+  grid-area: 1 / 1;
+  width: 18px;
+  height: 18px;
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s ease;
+}
+.theme-toggle .icon-sun {
+  transform: rotate(90deg) scale(0.4);
+  opacity: 0;
+}
+[data-theme='dark'] .theme-toggle .icon-sun {
+  transform: none;
+  opacity: 1;
+}
+[data-theme='dark'] .theme-toggle .icon-moon {
+  transform: rotate(-90deg) scale(0.4);
+  opacity: 0;
+}
+.theme-toggle--floating {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle svg {
+    transition: none;
+  }
 }

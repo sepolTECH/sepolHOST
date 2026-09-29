@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { ApiError } from '../../services/api'
 import { EMAIL_RE, validatePassword } from '../../utils/password'
 import '../Login/Login.css'
-import logoSepolhost from '../../assets/logo-sepolhost.png'
+import { Logo } from '../../components/Logo'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -67,7 +67,7 @@ export function Register() {
         noValidate
       >
         <div className="logo-sepolhost-login">
-          <img src={logoSepolhost} alt="" className="img-sepolhost-login" />
+          <Logo className="img-sepolhost-login" />
         </div>
         <p className="login__subtitle stagger" style={delay(1)}>
           Crie sua conta para começar

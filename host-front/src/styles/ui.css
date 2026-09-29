@@ -1,0 +1,401 @@
+/* =========================================================
+   UI base da área logada (botões, campos, modal, badges)
+   ========================================================= */
+
+/* ---------- Botões ---------- */
+.ui-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.25s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.ui-btn svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.ui-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.ui-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.ui-btn--primary {
+  color: var(--on-text);
+  background: var(--text);
+}
+/* brilho que atravessa o botão no hover (mesmo efeito do login) */
+.ui-btn--primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--on-text) 22%, transparent), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+.ui-btn--primary:hover:not(:disabled)::before {
+  left: 120%;
+}
+.ui-btn--primary:hover:not(:disabled) {
+  background: var(--text-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -10px var(--shadow);
+}
+
+.ui-btn--ghost {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.ui-btn--ghost:hover:not(:disabled) {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+}
+
+.ui-btn .spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--gray-500);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--gray-100);
+}
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ---------- Campos ---------- */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.ui-field--full {
+  grid-column: 1 / -1;
+}
+.ui-field > label,
+.ui-field__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.ui-field .req {
+  color: var(--gray-400);
+  margin-left: 2px;
+}
+
+.ui-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.ui-input::placeholder {
+  color: var(--gray-400);
+}
+.ui-input:hover {
+  border-color: var(--gray-400);
+}
+.ui-input:focus {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.ui-input:disabled {
+  background: var(--gray-50);
+  color: var(--gray-500);
+}
+.ui-field.has-error .ui-input,
+.ui-field.has-error .ui-segmented {
+  border-color: var(--danger);
+}
+.ui-field__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+  animation: fade-up 0.25s ease both;
+}
+.ui-field__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+/* input com ícone à esquerda (busca) */
+.ui-input-icon {
+  position: relative;
+}
+.ui-input-icon > svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  color: var(--gray-400);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.ui-input-icon .ui-input {
+  padding-left: 38px;
+}
+
+/* ---------- Seletor segmentado (PF/PJ, CPF/Passaporte) ---------- */
+.ui-segmented {
+  position: relative;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  height: 42px;
+  padding: 3px;
+  background: var(--gray-100);
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+.ui-segmented__thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  background: var(--surface);
+  border-radius: 7px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 0 0 1px var(--border);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* no escuro a pílula fica um tom acima do trilho */
+[data-theme='dark'] .ui-segmented__thumb {
+  background: var(--gray-200);
+}
+.ui-segmented button {
+  position: relative;
+  z-index: 1;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-500);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+.ui-segmented button[aria-checked='true'] {
+  color: var(--text);
+  font-weight: 600;
+}
+.ui-segmented button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+.ui-segmented button:disabled {
+  cursor: default;
+}
+
+/* ---------- Badge ---------- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border-radius: 6px;
+}
+.ui-badge--dark {
+  color: var(--on-text);
+  background: var(--text);
+}
+
+/* ---------- Modal ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+  animation: modal-fade 0.2s ease both;
+}
+.modal__dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100svh - 48px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -20px var(--shadow);
+  outline: none;
+  animation: modal-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.modal__dialog--md {
+  max-width: 560px;
+}
+.modal__dialog--lg {
+  max-width: 920px;
+}
+.modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.modal__subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+.modal__body {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--gray-50);
+  border-radius: 0 0 16px 16px;
+}
+
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@media (max-width: 640px) {
+  .modal {
+    padding: 0;
+    place-items: stretch;
+  }
+  .modal__dialog {
+    max-width: none;
+    max-height: none;
+    height: 100svh;
+    border: 0;
+    border-radius: 0;
+  }
+  .modal__footer {
+    border-radius: 0;
+  }
+  .modal__footer .ui-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0 14px;
+  }
+  .modal__footer .ui-btn--ghost {
+    flex: 0 0 auto;
+  }
+}
+
+/* Dica abaixo do valor dos cartões de indicadores */
+.kpi__hint {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.kpi__hint .commission-pct:first-child {
+  margin-left: 0;
+}
+
+/* Porcentagem ao lado do valor da comissão */
+.commission-pct {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--gray-600);
+  vertical-align: 1px;
+  white-space: nowrap;
+  background: var(--gray-100);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal,
+  .modal__dialog,
+  .ui-segmented__thumb {
+    animation: none;
+    transition: none;
+  }
+}

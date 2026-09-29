@@ -6,6 +6,12 @@ import { env } from './config/env.js';
 import { pool } from './db/pool.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { guestsRoutes } from './modules/guests/guests.routes.js';
+import { reservationsRoutes } from './modules/reservations/reservations.routes.js';
+import { blocklistRoutes } from './modules/blocklist/blocklist.routes.js';
+import { reviewsRoutes } from './modules/reviews/reviews.routes.js';
+import { financeRoutes } from './modules/finance/finance.routes.js';
+import { calendarRoutes } from './modules/calendar/calendar.routes.js';
 
 export const app = express();
 
@@ -32,6 +38,12 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/guests', guestsRoutes);
+app.use('/api/reservations', reservationsRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/blocklist', blocklistRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Rota não encontrada' });

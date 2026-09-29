@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { authApi, type User } from '../services/api'
+import { authApi, UNAUTHORIZED_EVENT, type User } from '../services/api'
 
 interface AuthContextValue {
   user: User | null
@@ -22,6 +22,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ user }) => setUser(user))
       .catch(() => setUser(null))
       .finally(() => setLoading(false))
+  }, [])
+
+  // Sessão expirou durante o uso (API respondeu 401) → volta para o login
+  useEffect(() => {
+    const onUnauthorized = () => setUser(null)
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized)
   }, [])
 
   const signIn = useCallback(async (email: string, password: string, remember: boolean) => {

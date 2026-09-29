@@ -1,0 +1,340 @@
+/* =========================================================
+   Fechamento do mês  (reaproveita Finance.css, Guests.css e Reservations.css)
+   ========================================================= */
+
+.closing__cash-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--gray-600);
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  animation: fade-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.closing__cash-note svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.closing__cash-note strong {
+  color: var(--text);
+}
+.closing__title-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--gray-500);
+}
+
+.closing__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* 7 cartões: recebido, comissões, custos, despesas, taxa, carnê-leão, líquido */
+.closing .kpis.finance__kpis--7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+/* ---------- Demonstrativo ---------- */
+.statement__list {
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+.statement__row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 16px;
+  font-variant-numeric: tabular-nums;
+}
+.statement__sign {
+  font-weight: 700;
+  color: var(--gray-400);
+  text-align: center;
+}
+.statement__label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14px;
+}
+.statement__label small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.statement__value {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.statement__row--out .statement__value {
+  color: var(--gray-500);
+}
+.statement__row--subtotal {
+  margin: 4px 0;
+  background: var(--gray-50);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.statement__row--subtotal .statement__label,
+.statement__row--subtotal .statement__value {
+  font-weight: 700;
+}
+.statement__row--final {
+  margin: 8px 12px 6px;
+  padding: 12px;
+  color: var(--on-text);
+  background: var(--text);
+  border-radius: 10px;
+}
+.statement__row--final .statement__sign {
+  color: color-mix(in srgb, var(--on-text) 60%, transparent);
+}
+.statement__row--final .statement__label {
+  font-weight: 700;
+}
+.statement__row--final .statement__value {
+  font-size: 18px;
+  font-weight: 700;
+}
+.statement__row--final.is-negative {
+  background: var(--danger);
+}
+.statement__row--subtotal.is-negative .statement__value {
+  color: var(--danger);
+}
+
+/* ---------- Configuração ---------- */
+.closing-settings__body {
+  display: flex;
+  flex-direction: column;
+}
+.closing-settings__block {
+  padding: 14px 16px;
+}
+.closing-settings__block + .closing-settings__block {
+  border-top: 1px solid var(--border);
+}
+.closing-settings__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  animation: fade-up 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.closing-settings__fields .ui-field--full {
+  grid-column: 1 / -1;
+}
+.closing-settings__fields .ui-field__hint strong {
+  color: var(--text);
+}
+.closing-settings__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--gray-50);
+  border-top: 1px solid var(--border);
+}
+.closing-settings__source {
+  flex: 1 1 220px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-500);
+}
+.closing-settings__footer .ui-field__error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.closing-settings__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ---------- Carnê-leão ---------- */
+.closing-tax__list {
+  margin: 0;
+  padding: 6px 0;
+}
+.closing-tax__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+}
+.closing-tax__row dt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14px;
+}
+.closing-tax__row dt small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.closing-tax__row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.closing-tax__row--sub dt,
+.closing-tax__row--sub dd {
+  padding-left: 12px;
+  color: var(--gray-600);
+}
+.closing-tax__row--sub dd {
+  color: var(--gray-500);
+}
+.closing-tax__row--total {
+  background: var(--gray-50);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.closing-tax__row--total dt,
+.closing-tax__row--total dd,
+.closing-tax__row--final dt,
+.closing-tax__row--final dd {
+  font-weight: 700;
+}
+.closing-tax__row--final {
+  border-top: 1px solid var(--border-strong);
+}
+.closing-tax__row--final dd {
+  font-size: 16px;
+}
+.closing-tax__foot {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-500);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- Por imóvel ---------- */
+.table--closing-props tfoot tr + tr td {
+  border-top: 0;
+}
+.table--closing-props .closing__props-total td {
+  font-weight: 700;
+  color: var(--text);
+  border-top: 1px solid var(--border-strong);
+}
+
+/* ---------- Locações recebidas / custos ---------- */
+.closing__panel-sub {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+.table--closing th,
+.table--closing td {
+  padding-right: 12px;
+  padding-left: 12px;
+}
+.table--closing th:first-child,
+.table--closing td:first-child {
+  padding-left: 16px;
+}
+.table--closing th:last-child,
+.table--closing td:last-child {
+  padding-right: 16px;
+}
+.table--closing .num {
+  white-space: nowrap;
+}
+.closing__cell-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+.table--closing tfoot td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-weight: 700;
+  background: var(--gray-50);
+  border-top: 1px solid var(--border-strong);
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 1500px) {
+  .closing .kpis.finance__kpis--7 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1100px) {
+  /* o período é importante aqui (a regra global esconde a 3ª coluna) */
+  .table--closing th:nth-child(3),
+  .table--closing td:nth-child(3) {
+    display: table-cell;
+  }
+}
+@media (max-width: 1200px) {
+  .closing__grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .closing .kpis.finance__kpis--7 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .closing-settings__fields {
+    grid-template-columns: 1fr;
+  }
+  .closing-settings__actions {
+    width: 100%;
+  }
+  .closing-settings__actions .ui-btn {
+    flex: 1;
+  }
+  .table--closing-props td:nth-child(3),
+  .table--closing td:nth-child(3) {
+    display: flex;
+  }
+  .table--closing td:first-child .doc-cell {
+    align-items: flex-start;
+  }
+  .table--closing tfoot {
+    display: block;
+  }
+  .table--closing tfoot td {
+    background: none;
+    border: 0;
+  }
+  .table--closing tfoot tr {
+    background: var(--gray-50);
+  }
+  .table--closing tfoot td:first-child {
+    padding-left: 0;
+    text-align: left;
+  }
+  .closing__panel-sub {
+    display: none;
+  }
+  .table--closing-props tfoot {
+    display: block;
+  }
+  .table--closing-props tfoot td:first-child {
+    padding-left: 0;
+    text-align: left;
+  }
+  .table--closing-props tfoot td:empty {
+    display: none;
+  }
+}

@@ -14,6 +14,15 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     });
   }
 
+  // Erros do body-parser do Express (corpo grande demais / JSON malformado)
+  const bodyErr = err as { type?: string; status?: number };
+  if (bodyErr.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Arquivo muito grande (máx. 5 MB)' });
+  }
+  if (bodyErr.type === 'entity.parse.failed') {
+    return res.status(400).json({ message: 'Corpo da requisição inválido' });
+  }
+
   console.error(err);
   return res.status(500).json({ message: 'Erro interno do servidor' });
 }

@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { ApiError } from '../../services/api'
 import './Login.css'
-import logoSepolhost from '../../assets/logo-sepolhost.png'
+import { Logo } from '../../components/Logo'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -63,7 +63,7 @@ export function Login() {
         noValidate
       >
         <div className='logo-sepolhost-login'>
-          <img src={logoSepolhost} alt="" className='img-sepolhost-login' />
+          <Logo className="img-sepolhost-login" />
         </div>
         <p className="login__subtitle stagger" style={delay(1)}>
           Entre com sua conta para continuar
@@ -137,7 +137,7 @@ export function Login() {
 
         <p className="login__switch stagger" style={delay(6)}>
           Não tem uma conta?{' '}
-          <Link className="link link--strong" to="/cadastro" state={location.state}>
+          <Link className="link link--strong" to="/criar-conta" state={location.state}>
             Criar conta
           </Link>
         </p>

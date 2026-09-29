@@ -21,8 +21,8 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 8px 24px -12px rgba(0, 0, 0, 0.08);
+    0 1px 2px color-mix(in srgb, var(--shadow) 50%, transparent),
+    0 8px 24px -12px var(--shadow);
   animation: card-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transition:
     transform 0.4s ease,
@@ -172,7 +172,7 @@
 }
 .field input:focus {
   border-color: var(--text);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 .field input:disabled {
   background: var(--gray-50);
@@ -278,7 +278,7 @@
   width: 22px;
   height: 22px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--on-text);
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -328,7 +328,7 @@
   width: 11px;
   height: 11px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--on-text);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -344,7 +344,7 @@
   stroke-dashoffset: 0;
 }
 .check input:focus-visible + .check__box {
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
 /* =========================================================
@@ -408,7 +408,7 @@
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-text);
   background: var(--text);
   border: 0;
   border-radius: 999px;
@@ -431,7 +431,7 @@
   left: -60%;
   width: 40%;
   height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--on-text) 22%, transparent), transparent);
   transform: skewX(-20deg);
   transition: left 0.6s ease;
 }
@@ -439,16 +439,16 @@
   left: 120%;
 }
 .btn:hover:not(:disabled) {
-  background: #000;
+  background: var(--text-strong);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 20px -10px var(--shadow);
 }
 .btn:active:not(:disabled) {
   transform: translateY(0) scale(0.99);
 }
 .btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 .btn:disabled {
   cursor: default;
@@ -486,7 +486,7 @@
   width: 20px;
   height: 20px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--on-text);
   stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;

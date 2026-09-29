@@ -21,6 +21,9 @@ RUN npm install --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 
+# Pasta das fotos de documento (montada como volume no docker-compose)
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+
 USER node
 EXPOSE 3333
 

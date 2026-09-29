@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, authApi } from '../../services/api'
 import { validatePassword } from '../../utils/password'
 import '../Login/Login.css'
-import logoSepolhost from '../../assets/logo-sepolhost.png'
+import { Logo } from '../../components/Logo'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
@@ -79,7 +79,7 @@ export function ResetPassword() {
         noValidate
       >
         <div className="logo-sepolhost-login">
-          <img src={logoSepolhost} alt="" className="img-sepolhost-login" />
+          <Logo className="img-sepolhost-login" />
         </div>
         <p className="login__subtitle stagger" style={delay(1)}>
           Crie uma nova senha para sua conta
@@ -159,7 +159,7 @@ function Notice({
     <main className="login">
       <div className="login__card">
         <div className="logo-sepolhost-login">
-          <img src={logoSepolhost} alt="" className="img-sepolhost-login" />
+          <Logo className="img-sepolhost-login" />
         </div>
         <div className="login__notice stagger" style={delay(1)}>
           {success && (
