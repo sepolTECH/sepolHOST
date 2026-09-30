@@ -1,7 +1,7 @@
 import { Search, Star, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { guestsApi, type Guest, type MainGuest } from '../../services/api'
-import { DOCUMENT_LABEL, formatDocument, initials } from '../../utils/documents'
+import { describeDocument, initials } from '../../utils/documents'
 import { formatRating } from '../../utils/rating'
 import { BlockedAlert } from './BlockedAlert'
 import { BlockedBadge } from './BlockedBadge'
@@ -91,9 +91,7 @@ export function GuestPicker({ id, value, onChange, disabled, invalid, describedB
           </span>
           <span className="picker-selected__info">
             <strong>{value.fullName}</strong>
-            <small>
-              {DOCUMENT_LABEL[value.documentType]} {formatDocument(value.documentType, value.documentNumber)}
-            </small>
+            <small>{describeDocument(value.documentType, value.documentNumber)}</small>
           </span>
           {!disabled && (
             <button
@@ -171,7 +169,7 @@ export function GuestPicker({ id, value, onChange, disabled, invalid, describedB
                 <span className="picker-selected__info">
                   <strong>{g.fullName}</strong>
                   <small>
-                    {DOCUMENT_LABEL[g.documentType]} {formatDocument(g.documentType, g.documentNumber)} · {g.nationality}
+                    {describeDocument(g.documentType, g.documentNumber)} · {g.nationality}
                   </small>
                 </span>
                 <span className="picker__option-side">

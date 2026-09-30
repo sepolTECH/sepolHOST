@@ -1,7 +1,7 @@
 import { CalendarPlus, ExternalLink, Pencil } from 'lucide-react'
 import { Modal } from '../../components/ui/Modal'
 import type { Reservation } from '../../services/api'
-import { DOCUMENT_LABEL, formatDocument } from '../../utils/documents'
+import { describeDocument } from '../../utils/documents'
 import { formatDate, formatMoney, formatPercent } from '../../utils/money'
 import { CommissionPct } from '../../components/ui/CommissionPct'
 import { openAttachment } from './attachments'
@@ -89,11 +89,8 @@ export function ReservationViewModal({ reservation: r, onClose, onEdit, onExtend
               <li>
                 <span className="companion__index">1</span>
                 <span className="picker-selected__info">
-                  <strong>{r.mainGuest.fullName}</strong>
-                  <small>
-                    {DOCUMENT_LABEL[r.mainGuest.documentType]}{' '}
-                    {formatDocument(r.mainGuest.documentType, r.mainGuest.documentNumber)}
-                  </small>
+                  <strong>{r.mainGuest?.fullName ?? 'Sem hóspede vinculado'}</strong>
+                  {r.mainGuest && <small>{describeDocument(r.mainGuest.documentType, r.mainGuest.documentNumber)}</small>}
                 </span>
                 <span className="ui-badge ui-badge--dark">Responsável</span>
               </li>

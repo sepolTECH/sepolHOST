@@ -232,10 +232,17 @@ export function Guests() {
                         </td>
                         <td data-label="Nacionalidade">{g.nationality}</td>
                         <td data-label="Identificação">
-                          <span className="doc-cell">
-                            <small>{DOCUMENT_LABEL[g.documentType]}</small>
-                            <span className="guest-form__mono">{formatDocument(g.documentType, g.documentNumber)}</span>
-                          </span>
+                          {g.documentType && g.documentNumber ? (
+                            <span className="doc-cell">
+                              <small>{DOCUMENT_LABEL[g.documentType]}</small>
+                              <span className="guest-form__mono">{formatDocument(g.documentType, g.documentNumber)}</span>
+                            </span>
+                          ) : (
+                            <span className="doc-cell">
+                              <small>Documento</small>
+                              <span className="guest-cell__email"><span className="muted">Não informado</span></span>
+                            </span>
+                          )}
                         </td>
                         <td data-label="Telefone" className="nowrap">
                           {formatPhone(g.phone)}

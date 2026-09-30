@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, CircleCheck, Lock, Pencil, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Check, CircleCheck, Lock, Pencil, RotateCcw, Users } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DependentNotice } from '../../components/ui/DependentNotice'
 import { Modal } from '../../components/ui/Modal'
@@ -7,6 +7,8 @@ import {
   ApiError,
   guestsApi,
   type DocumentType,
+  type DuplicateField,
+  type DuplicateMatch,
   type Guest,
   type GuestInput,
   type PersonType,
@@ -14,6 +16,7 @@ import {
 import { lookupCep } from '../../utils/cep'
 import {
   COUNTRIES,
+  describeDocument,
   DOCUMENT_LABEL,
   formatPhone,
   isBrazil,
@@ -29,6 +32,7 @@ import {
   validatePhone,
   validateRg,
 } from '../../utils/documents'
+import { cleanName, maskEmail, maskName } from '../../utils/text'
 import { DocumentPhotoField } from './DocumentPhotoField'
 import { useDocumentPhoto } from './useDocumentPhoto'
 
@@ -46,6 +50,7 @@ const NOTES_MAX = 2000
 
 const EMPTY: GuestInput = {
   fullName: '',
+  noDocument: false,
   personType: 'PF',
   isForeign: false,
   nationality: 'Brasileira',
@@ -66,7 +71,20 @@ const EMPTY: GuestInput = {
 }
 
 /** Campos da etapa de identificação (não contam como "dados preenchidos" ao fechar). */
-const ID_FIELDS: (keyof GuestInput)[] = ['personType', 'isForeign', 'documentType', 'documentNumber', 'nationality']
+const ID_FIELDS: (keyof GuestInput)[] = [
+  'personType',
+  'isForeign',
+  'noDocument',
+  'documentType',
+  'documentNumber',
+  'nationality',
+]
+
+const DUP_FIELD_LABEL: Record<DuplicateField, string> = {
+  name: 'Nome',
+  phone: 'Telefone',
+  email: 'E-mail',
+}
 
 const FOREIGN_NATIONALITIES = NATIONALITIES.filter((n) => n !== 'Brasileira')
 const normalizeDoc = (v: string) => v.toUpperCase().replace(/[^0-9A-Z]/g, '')
@@ -82,13 +100,16 @@ function isComplete(type: DocumentType, value: string) {
 
 function fromGuest(g: Guest): GuestInput {
   const country = g.addressCountry ?? 'Brasil'
+  // Hóspede cadastrado sem documento: o tipo volta ao padrão do perfil (CPF, passaporte ou CNPJ)
+  const documentType: DocumentType = g.documentType ?? (g.personType === 'PJ' ? 'CNPJ' : g.isForeign ? 'PASSAPORTE' : 'CPF')
   return {
     fullName: g.fullName,
+    noDocument: !g.documentNumber,
     personType: g.personType,
     isForeign: g.isForeign,
     nationality: g.nationality,
-    documentType: g.documentType,
-    documentNumber: maskDocument(g.documentType, g.documentNumber),
+    documentType,
+    documentNumber: g.documentNumber ? maskDocument(documentType, g.documentNumber) : '',
     rg: g.rg ?? '',
     email: g.email ?? '',
     phone: maskPhone(g.phone),
@@ -109,8 +130,8 @@ function validate(v: GuestInput): Errors {
   const add = (key: keyof GuestInput, msg: string) => {
     if (msg) e[key] = msg
   }
-  add('documentNumber', validateDocument(v.documentType, v.documentNumber))
-  if (v.fullName.trim().length < 3) e.fullName = 'Informe o nome completo'
+  if (!v.noDocument) add('documentNumber', validateDocument(v.documentType, v.documentNumber))
+  if (cleanName(v.fullName, v.personType).length < 3) e.fullName = 'Informe o nome completo'
   if (v.isForeign && v.nationality.trim().length < 2) e.nationality = 'Informe a nacionalidade'
   if (v.personType === 'PF' && !v.isForeign) add('rg', validateRg(v.rg))
   add('email', validateEmail(v.email))
@@ -159,10 +180,12 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
   const docError = validateDocument(values.documentType, values.documentNumber)
   const docComplete = isComplete(values.documentType, values.documentNumber)
   const docKey = `${values.documentType}|${normalizeDoc(values.documentNumber)}|${retry}`
-  const canLookup = !isEdit && !docError
+  // "Cadastrar sem CPF": o documento não é consultado e os demais campos ficam liberados
+  const noDoc = values.noDocument && values.personType === 'PF'
+  const canLookup = !isEdit && !noDoc && !docError
 
   // "checking" = documento válido, mas a última resposta ainda não é deste documento
-  const lookupStatus: 'idle' | 'invalid' | 'checking' | Lookup['status'] = isEdit
+  const lookupStatus: 'idle' | 'invalid' | 'checking' | Lookup['status'] = isEdit || noDoc
     ? 'available'
     : docError
       ? docComplete
@@ -205,13 +228,60 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canLookup, docKey])
 
-  // Ao liberar (CPF/CNPJ), leva o foco para o nome. Em passaporte/DNI o usuário pode ainda estar digitando.
+  // Ao liberar (CPF/CNPJ, ou "sem documento"), leva o foco para o nome.
+  // Em passaporte/DNI o usuário pode ainda estar digitando o número.
   useEffect(() => {
-    if (!isEdit && lookupStatus === 'available' && !isForeignDoc(values.documentType)) {
+    if (!isEdit && lookupStatus === 'available' && (noDoc || !isForeignDoc(values.documentType))) {
       fullNameRef.current?.focus()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookupStatus])
+
+  // ---------------------------------------------------------------------------
+  // Possíveis duplicados: nome (inclusive abreviado), telefone e e-mail.
+  // Como o documento pode faltar, esses 3 dados é que evitam cadastrar a mesma pessoa duas vezes.
+  // ---------------------------------------------------------------------------
+  const [dups, setDups] = useState<{ key: string; matches: DuplicateMatch[] } | null>(null)
+  const [confirmedIds, setConfirmedIds] = useState('')
+  const dupName = cleanName(values.fullName, values.personType)
+  const dupNameTokens = dupName.split(' ').filter(Boolean)
+  const dupKey = `${values.personType}|${dupName}|${onlyDigits(values.phone)}|${values.email.trim()}`
+
+  useEffect(() => {
+    if (locked) return
+    const nameOk = dupNameTokens.length >= 2 && dupNameTokens[0].length >= 3
+    const phoneOk = onlyDigits(values.phone).length >= 10
+    const emailOk = !validateEmail(values.email) && !!values.email.trim()
+    if (!nameOk && !phoneOk && !emailOk) return
+    const controller = new AbortController()
+    const t = window.setTimeout(() => {
+      guestsApi
+        .checkDuplicates(
+          {
+            fullName: dupName,
+            personType: values.personType,
+            phone: values.phone,
+            email: values.email.trim(),
+            excludeId: guest?.id,
+          },
+          controller.signal,
+        )
+        .then(({ matches }) => setDups({ key: dupKey, matches }))
+        .catch(() => {}) // informativo: se a consulta falhar, o cadastro segue normalmente
+    }, 400)
+    return () => {
+      window.clearTimeout(t)
+      controller.abort()
+    }
+    // dupKey já reflete nome + tipo + telefone + e-mail
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dupKey, locked])
+
+  const matches = dups?.key === dupKey ? dups.matches : []
+  const matchIds = matches.map((m) => m.guest.id).join(',')
+  /** Nome idêntico, e-mail igual ou 2+ dados batendo: muito provavelmente é a mesma pessoa. */
+  const strongDuplicate = matches.some((m) => m.exactName || m.matchedOn.length >= 2 || m.matchedOn.includes('email'))
+  const needsConfirm = !isEdit && strongDuplicate && confirmedIds !== matchIds
 
   // ---------------------------------------------------------------------------
   // CEP (ViaCEP)
@@ -279,9 +349,13 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
         ...v,
         personType: type,
         isForeign: false,
+        // CNPJ é obrigatório: só pessoa física pode ficar sem documento
+        noDocument: type === 'PJ' ? false : v.noDocument,
         nationality: 'Brasileira',
         documentType,
         documentNumber: documentType === v.documentType ? v.documentNumber : '',
+        // nome de PJ aceita números e & . / -; ao voltar para PF, limpa o que não vale mais
+        fullName: maskName(v.fullName, type),
       }
     })
     setErrors((e) => ({ ...e, documentNumber: undefined, nationality: undefined }))
@@ -300,6 +374,14 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
     setErrors((e) => ({ ...e, documentNumber: undefined, nationality: undefined, rg: undefined }))
     setDirty(true)
     requestAnimationFrame(() => docInputRef.current?.focus())
+  }
+
+  function toggleNoDocument(checked: boolean) {
+    setValues((v) => ({ ...v, noDocument: checked, documentNumber: checked ? '' : v.documentNumber }))
+    setErrors((e) => ({ ...e, documentNumber: undefined }))
+    setDirty(true)
+    // sem documento: já vai para o nome; com documento: volta para o número
+    if (!checked) requestAnimationFrame(() => docInputRef.current?.focus())
   }
 
   function changeDocumentType(type: DocumentType) {
@@ -334,15 +416,23 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
       return
     }
 
+    // Cadastro muito parecido com outro já existente: pede confirmação de que é outra pessoa
+    if (needsConfirm) {
+      setFormError('Confira os cadastros parecidos e confirme que é outra pessoa para continuar.')
+      document.getElementById('guest-dup-confirm')?.focus()
+      return
+    }
+
     setSaving(true)
     setFormError('')
     let saved: Guest
     try {
       const payload: GuestInput = {
         ...values,
-        fullName: values.fullName.trim().replace(/\s+/g, ' '),
+        noDocument: noDoc,
+        fullName: cleanName(values.fullName, values.personType),
         nationality: values.nationality.trim(),
-        email: values.email.trim(),
+        email: maskEmail(values.email.trim()),
         notes: values.notes.trim(),
       }
       saved = (isEdit ? await guestsApi.update(guest.id, payload) : await guestsApi.create(payload)).guest
@@ -388,7 +478,7 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
   }[values.documentType]
 
   const docLabel = DOCUMENT_LABEL[values.documentType]
-  const docInvalid = !!errors.documentNumber || lookupStatus === 'invalid' || lookupStatus === 'exists'
+  const docInvalid = !noDoc && (!!errors.documentNumber || lookupStatus === 'invalid' || lookupStatus === 'exists')
   const isPF = values.personType === 'PF'
 
   const field = (key: keyof GuestInput, extra = '') => `ui-field ${extra} ${errors[key] ? 'has-error' : ''}`
@@ -407,13 +497,23 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
 
   /** Linha de status abaixo do número do documento (só no novo cadastro). */
   function lookupHint() {
+    if (noDoc) {
+      return (
+        <p className="ui-field__hint guest-lookup">
+          <CircleCheck aria-hidden />
+          Sem {docLabel}: o cadastro será conferido pelo nome, telefone e e-mail
+        </p>
+      )
+    }
     if (isEdit || errors.documentNumber) return null
     switch (lookupStatus) {
       case 'idle':
         return (
           <p className="ui-field__hint guest-lookup">
             <Lock aria-hidden />
-            Informe o {docLabel} para liberar os demais campos
+            {isPF
+              ? `Informe o ${docLabel} para liberar os demais campos, ou marque que o hóspede não informou`
+              : `Informe o ${docLabel} para liberar os demais campos`}
           </p>
         )
       case 'invalid':
@@ -470,7 +570,7 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
     <div className={`ui-field ${isPF && values.isForeign ? '' : 'ui-field--full'} ${docInvalid ? 'has-error' : ''}`}>
       <label htmlFor="guest-documentNumber">
         Número do {docLabel}
-        <span className="req">*</span>
+        {!noDoc && <span className="req">*</span>}
       </label>
       <input
         id="guest-documentNumber"
@@ -479,15 +579,31 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
         data-autofocus={!isEdit || undefined}
         autoComplete="off"
         inputMode={values.documentType === 'CPF' ? 'numeric' : 'text'}
-        placeholder={docPlaceholder}
+        placeholder={noDoc ? 'Não informado' : docPlaceholder}
         value={values.documentNumber}
         onChange={(e) => set('documentNumber', maskDocument(values.documentType, e.target.value))}
-        disabled={saving}
+        disabled={saving || noDoc}
         aria-invalid={docInvalid || undefined}
         aria-describedby={errors.documentNumber || lookupStatus === 'invalid' ? 'guest-documentNumber-error' : undefined}
       />
       {err('documentNumber')}
       <div aria-live="polite">{lookupHint()}</div>
+
+      {/* LGPD: nem sempre o hóspede concorda em passar o documento. Só pessoa física. */}
+      {isPF && (
+        <label className="guest-nodoc">
+          <input
+            type="checkbox"
+            checked={noDoc}
+            onChange={(e) => toggleNoDocument(e.target.checked)}
+            disabled={saving}
+          />
+          <span>
+            Cadastrar sem {docLabel}
+            <small>O hóspede não quis ou não pôde informar (LGPD). Nome, telefone e e-mail evitam cadastro duplicado.</small>
+          </span>
+        </label>
+      )}
     </div>
   )
 
@@ -496,7 +612,15 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
       open={open}
       onClose={requestClose}
       title={isEdit ? 'Editar hóspede' : 'Novo hóspede'}
-      subtitle={isEdit ? guest.fullName : locked ? 'Comece pelo documento do hóspede' : 'Preencha os dados do hóspede'}
+      subtitle={
+        isEdit
+          ? guest.fullName
+          : locked
+            ? isPF
+              ? `Comece pelo ${docLabel} ou marque que o hóspede não informou`
+              : `Comece pelo ${docLabel} do hóspede`
+            : 'Preencha os dados do hóspede'
+      }
       footer={
         <>
           <button type="button" className="ui-btn ui-btn--ghost" onClick={requestClose} disabled={saving}>
@@ -632,13 +756,17 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
                   className="ui-input"
                   data-autofocus={isEdit || undefined}
                   autoComplete="off"
-                  placeholder={isPF ? 'Nome e sobrenome' : 'Razão social da empresa'}
+                  placeholder={isPF ? 'NOME E SOBRENOME' : 'RAZÃO SOCIAL DA EMPRESA'}
                   value={values.fullName}
                   maxLength={160}
-                  onChange={(e) => set('fullName', e.target.value)}
+                  onChange={(e) => set('fullName', maskName(e.target.value, values.personType))}
                   {...aria('fullName')}
                 />
-                {err('fullName')}
+                {err('fullName') ?? (
+                  <p className="ui-field__hint">
+                    {isPF ? 'Só letras, em maiúsculas e sem acentos' : 'Em maiúsculas e sem acentos ou símbolos'}
+                  </p>
+                )}
               </div>
 
               {isPF && values.isForeign && (
@@ -681,6 +809,75 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
               )}
 
             </div>
+
+            {/* Cadastros que podem ser a mesma pessoa (nome parecido/abreviado, telefone ou e-mail iguais) */}
+            <div aria-live="polite">
+              {matches.length > 0 && (
+                <div className={`guest-dups ${strongDuplicate ? 'is-strong' : ''}`} role="status">
+                  <div className="guest-dups__head">
+                    <span className="guest-dups__icon">
+                      <Users strokeWidth={1.8} aria-hidden />
+                    </span>
+                    <div>
+                      <strong>
+                        {matches.length === 1
+                          ? 'Já existe um cadastro parecido'
+                          : `Já existem ${matches.length} cadastros parecidos`}
+                      </strong>
+                      <p>Confira antes de continuar para não duplicar o hóspede (o nome pode estar abreviado).</p>
+                    </div>
+                  </div>
+
+                  <ul className="guest-dups__list">
+                    {matches.map(({ guest: g, matchedOn, exactName }) => (
+                      <li key={g.id} className="guest-dups__item">
+                        <div className="guest-dups__info">
+                          <strong className={matchedOn.includes('name') ? 'is-match' : undefined}>{g.fullName}</strong>
+                          <span className={matchedOn.includes('phone') ? 'is-match' : undefined}>
+                            {formatPhone(g.phone)}
+                          </span>
+                          {g.email && <span className={matchedOn.includes('email') ? 'is-match' : undefined}>{g.email}</span>}
+                          <small>{describeDocument(g.documentType, g.documentNumber)}</small>
+                          <span className="guest-dups__badges">
+                            {matchedOn.map((f) => (
+                              <span key={f} className="guest-dups__badge">
+                                {f === 'name' ? (exactName ? 'Mesmo nome' : 'Nome parecido') : `Mesmo ${DUP_FIELD_LABEL[f].toLowerCase()}`}
+                              </span>
+                            ))}
+                          </span>
+                        </div>
+                        {onEditExisting && !isEdit && (
+                          <button
+                            type="button"
+                            className="ui-btn ui-btn--ghost"
+                            onClick={() => {
+                              if (window.confirm('Abrir o cadastro existente? O que você digitou aqui será descartado.')) {
+                                onEditExisting(g)
+                              }
+                            }}
+                          >
+                            <Pencil strokeWidth={1.8} />
+                            Abrir cadastro
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {!isEdit && strongDuplicate && (
+                    <label className="guest-dups__confirm">
+                      <input
+                        id="guest-dup-confirm"
+                        type="checkbox"
+                        checked={confirmedIds === matchIds}
+                        onChange={(e) => setConfirmedIds(e.target.checked ? matchIds : '')}
+                      />
+                      <span>Confirmo que é outra pessoa, diferente dos cadastros acima</span>
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="guest-form__section">
@@ -707,16 +904,18 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
                 <label htmlFor="guest-email">E-mail {optional}</label>
                 <input
                   className="ui-input"
-                  type="email"
+                  type="text"
                   autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   inputMode="email"
                   placeholder="nome@exemplo.com"
                   value={values.email}
                   maxLength={160}
-                  onChange={(e) => set('email', e.target.value)}
+                  onChange={(e) => set('email', maskEmail(e.target.value))}
                   {...aria('email')}
                 />
-                {err('email')}
+                {err('email') ?? <p className="ui-field__hint">Minúsculas; só letras, números, @ . - _</p>}
               </div>
 
             </div>

@@ -6,7 +6,8 @@ import { formatDateShort } from '../../utils/money'
 
 type Tab = 'todo' | 'done'
 
-const isDone = (r: AssociateReservationRow) => r.inventoryStatus === 'VISTORIADO' && r.reviewed
+// Sem hóspede vinculado não há o que avaliar: só a vistoria conta
+const isDone = (r: AssociateReservationRow) => r.inventoryStatus === 'VISTORIADO' && (r.reviewed || !r.hasGuest)
 
 /** Início do associado: reservas liberadas pelo cliente, com as duas tarefas (vistoria e avaliação). */
 export function AssociateHome() {
@@ -88,7 +89,7 @@ export function AssociateHome() {
               <div>
                 <h2 className="ap-card__title">{r.propertyName}</h2>
                 <div className="ap-card__meta">
-                  <span>Hóspede: {r.guestName}</span>
+                  <span>Hóspede: {r.guestName ?? 'não informado'}</span>
                   <span>
                     {formatDateShort(r.checkIn)} até {formatDateShort(r.finalCheckOut)}
                   </span>
@@ -105,15 +106,17 @@ export function AssociateHome() {
                 </Link>
               </div>
 
-              <div className="ap-card__task">
-                <span className={`ap-pill ${r.reviewed ? 'ap-pill--done' : ''}`}>
-                  {r.reviewed ? 'Hospedagem avaliada' : 'Avaliação pendente'}
-                </span>
-                <Link to={`/associado/reserva/${r.id}/avaliacao`} className="ap-btn">
-                  <Star aria-hidden />
-                  {r.reviewed ? 'Ver / alterar avaliação' : 'Avaliar hospedagem'}
-                </Link>
-              </div>
+              {r.hasGuest && (
+                <div className="ap-card__task">
+                  <span className={`ap-pill ${r.reviewed ? 'ap-pill--done' : ''}`}>
+                    {r.reviewed ? 'Hospedagem avaliada' : 'Avaliação pendente'}
+                  </span>
+                  <Link to={`/associado/reserva/${r.id}/avaliacao`} className="ap-btn">
+                    <Star aria-hidden />
+                    {r.reviewed ? 'Ver / alterar avaliação' : 'Avaliar hospedagem'}
+                  </Link>
+                </div>
+              )}
             </li>
           )
         })}

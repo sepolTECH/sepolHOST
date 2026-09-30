@@ -26,8 +26,8 @@ interface StayRow {
   id: string;
   reservation_number: string;
   property_name: string;
-  main_guest_id: string;
-  main_guest_name: string;
+  main_guest_id: string | null;
+  main_guest_name: string | null;
   platform: Platform | null;
   status: Status;
   check_in: string;
@@ -152,7 +152,7 @@ async function computeClosing(ownerId: string, year: number, month: number) {
               r.costs_cents::float8 AS costs_cents, r.extensions_cents::float8 AS extensions_cents,
               r.extensions_commission_cents::float8 AS extensions_commission_cents
          FROM reservations r
-         JOIN guests g ON g.id = r.main_guest_id
+         LEFT JOIN guests g ON g.id = r.main_guest_id
         WHERE r.owner_id = $5
           AND ((r.final_check_out >= $1::date AND r.final_check_out < $2::date)
             OR (r.final_check_out >= $3::date AND r.final_check_out < $4::date AND r.costs_cents > 0))
@@ -168,7 +168,7 @@ async function computeClosing(ownerId: string, year: number, month: number) {
     id: r.id,
     reservationNumber: r.reservation_number,
     propertyName: r.property_name.trim().replace(/\s+/g, ' '),
-    mainGuest: { id: r.main_guest_id, fullName: r.main_guest_name },
+    mainGuest: r.main_guest_id ? { id: r.main_guest_id, fullName: r.main_guest_name ?? '' } : null,
     platform: r.platform,
     status: r.status,
     checkIn: r.check_in,

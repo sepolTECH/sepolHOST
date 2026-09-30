@@ -133,7 +133,7 @@ export function GuestStaysHistory({ guestId }: GuestStaysHistoryProps) {
                     <span className="stays__meta">
                       Nº {r.reservationNumber}
                       {r.platform && ` · ${PLATFORM_LABEL[r.platform]}`}
-                      {r.guestRole === 'ACOMPANHANTE' && ` · Resp.: ${r.mainGuest.fullName}`}
+                      {r.guestRole === 'ACOMPANHANTE' && ` · Resp.: ${r.mainGuest?.fullName ?? 'sem hóspede'}`}
                     </span>
                   </span>
                   <span className="stays__side">

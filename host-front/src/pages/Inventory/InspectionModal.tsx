@@ -121,7 +121,7 @@ export function InspectionModal({ reservationId, onClose, onChanged, onNotify }:
       open
       onClose={onClose}
       title={r ? `Vistoria · reserva ${r.reservationNumber}` : 'Vistoria'}
-      subtitle={r ? `${r.propertyName} · ${r.guestName}` : undefined}
+      subtitle={r ? `${r.propertyName} · ${r.guestName ?? 'Sem hóspede'}` : undefined}
       footer={footer}
     >
       {loading ? (

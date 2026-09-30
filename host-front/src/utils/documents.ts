@@ -70,6 +70,14 @@ export function maskDocument(type: DocumentType, value: string) {
 
 export const formatDocument = maskDocument
 
+/** Rótulo do documento; hóspede sem documento (LGPD) não tem tipo. */
+export const documentLabel = (type: DocumentType | null) => (type ? DOCUMENT_LABEL[type] : 'Documento')
+
+/** "CPF 000.000.000-00" — ou "Sem documento informado" quando o hóspede não passou o documento. */
+export function describeDocument(type: DocumentType | null, number: string | null) {
+  return type && number ? `${DOCUMENT_LABEL[type]} ${maskDocument(type, number)}` : 'Sem documento informado'
+}
+
 /**
  * Telefone: formato brasileiro por padrão — (11) 91234-5678.
  * Começando com "+", aceita número internacional (+351912345678).

@@ -241,12 +241,12 @@ async function readReservation(client: PoolClient, userId: string, reservationId
     inventory_status: 'PENDENTE' | 'VISTORIADO';
     inspected_at: Date | null;
     inspected_by_name: string | null;
-    guest_name: string;
+    guest_name: string | null;
   }>(
     `SELECT r.id, r.reservation_number, r.property_name, r.check_in, r.final_check_out, r.status,
             r.inventory_status, r.inspected_at, u.name AS inspected_by_name, g.full_name AS guest_name
        FROM reservations r
-       JOIN guests g ON g.id = r.main_guest_id
+       LEFT JOIN guests g ON g.id = r.main_guest_id
        LEFT JOIN users u ON u.id = r.inspected_by
       WHERE r.id = $1 AND r.owner_id = $2`,
     [reservationId, userId],
@@ -308,7 +308,7 @@ export async function listReservations(userId: string, { search, status, page, p
     `SELECT COUNT(*)::int AS "all",
             COUNT(*) FILTER (WHERE r.inventory_status = 'PENDENTE')::int AS pending,
             COUNT(*) FILTER (WHERE r.inventory_status = 'VISTORIADO')::int AS inspected
-       FROM reservations r JOIN guests g ON g.id = r.main_guest_id ${baseWhere}`,
+       FROM reservations r LEFT JOIN guests g ON g.id = r.main_guest_id ${baseWhere}`,
     params,
   );
 
@@ -325,7 +325,7 @@ export async function listReservations(userId: string, { search, status, page, p
     id: string;
     reservation_number: string;
     property_name: string;
-    guest_name: string;
+    guest_name: string | null;
     check_in: string;
     final_check_out: string;
     status: 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO';
@@ -353,7 +353,7 @@ export async function listReservations(userId: string, { search, status, page, p
                         WHERE i.owner_id = r.owner_id AND ${sameProperty('i.property_name', 'r.property_name')})
             END, 0)::bigint AS total_cents
        FROM reservations r
-       JOIN guests g ON g.id = r.main_guest_id
+       LEFT JOIN guests g ON g.id = r.main_guest_id
       WHERE ${listWhere.join(' AND ')}
       ORDER BY r.final_check_out DESC, r.created_at DESC
       LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,

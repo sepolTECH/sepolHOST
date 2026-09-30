@@ -3,6 +3,7 @@ import { AppError } from '../../utils/AppError.js';
 import { alnum, normalizeDocument, type DocumentType } from '../../utils/documents.js';
 import { absolutePath, detectFileType, removeFile, saveFile } from '../../utils/storage.js';
 import { BLOCK_COLUMNS, toBlocked, type BlockColumnsRow } from '../blocklist/blocklist.service.js';
+import { compareNames, isEmailShape, isNameSearchable, normalizeEmail, samePhone } from '../../utils/text.js';
 import type { GuestInput, ListQuery } from './guests.schema.js';
 
 interface GuestRow extends BlockColumnsRow {
@@ -11,8 +12,9 @@ interface GuestRow extends BlockColumnsRow {
   person_type: 'PF' | 'PJ';
   is_foreign: boolean;
   nationality: string;
-  document_type: DocumentType;
-  document_number: string;
+  // null = hóspede que não informou o documento (LGPD)
+  document_type: DocumentType | null;
+  document_number: string | null;
   rg: string | null;
   email: string | null;
   phone: string;
@@ -173,6 +175,68 @@ export async function findByDocumentKey(ownerId: string, document: string) {
   if (key.length < 5) return null;
   const { rows } = await query<GuestRow>(`${SELECT} WHERE g.owner_id = $2 AND g.document_number = $1 ORDER BY g.created_at LIMIT 1`, [key, ownerId]);
   return rows[0] ? toGuest(rows[0]) : null;
+}
+
+export type DuplicateField = 'name' | 'phone' | 'email';
+
+export interface DuplicateQuery {
+  fullName: string;
+  personType: 'PF' | 'PJ';
+  phone: string;
+  email: string;
+  excludeId?: string;
+}
+
+/**
+ * Cadastros do cliente que podem ser a mesma pessoa, comparando nome (inclusive abreviado),
+ * telefone e e-mail. `matchedOn` diz por qual(is) dado(s) bateu; `exactName` = nome idêntico.
+ * Os mais prováveis (mais dados batendo) vêm primeiro.
+ */
+export async function findPossibleDuplicates(ownerId: string, q: DuplicateQuery) {
+  const email = normalizeEmail(q.email);
+  const checkName = isNameSearchable(q.fullName);
+  const checkPhone = q.phone.replace(/\D/g, '').length >= 10;
+  const checkEmail = isEmailShape(email);
+  if (!checkName && !checkPhone && !checkEmail) return [];
+
+  const params: unknown[] = [ownerId];
+  let exclude = '';
+  if (q.excludeId) {
+    params.push(q.excludeId);
+    exclude = 'AND id <> $2';
+  }
+  const { rows } = await query<{ id: string; full_name: string; phone: string; email: string | null }>(
+    `SELECT id, full_name, phone, email FROM guests WHERE owner_id = $1 ${exclude}`,
+    params,
+  );
+
+  const hits: { id: string; matchedOn: DuplicateField[]; exactName: boolean }[] = [];
+  for (const r of rows) {
+    const matchedOn: DuplicateField[] = [];
+    let exactName = false;
+    if (checkName) {
+      const cmp = compareNames(q.fullName, r.full_name);
+      if (cmp) matchedOn.push('name');
+      exactName = cmp === 'exact';
+    }
+    if (checkPhone && samePhone(q.phone, r.phone)) matchedOn.push('phone');
+    if (checkEmail && r.email && normalizeEmail(r.email) === email) matchedOn.push('email');
+    if (matchedOn.length) hits.push({ id: r.id, matchedOn, exactName });
+  }
+  if (!hits.length) return [];
+
+  hits.sort((a, b) => b.matchedOn.length - a.matchedOn.length || Number(b.exactName) - Number(a.exactName));
+  const top = hits.slice(0, 8);
+
+  const { rows: guests } = await query<GuestRow>(`${SELECT} WHERE g.owner_id = $1 AND g.id = ANY($2::uuid[])`, [
+    ownerId,
+    top.map((h) => h.id),
+  ]);
+  const byId = new Map(guests.map((g) => [g.id, toGuest(g)]));
+  return top.flatMap((h) => {
+    const guest = byId.get(h.id);
+    return guest ? [{ guest, matchedOn: h.matchedOn, exactName: h.exactName }] : [];
+  });
 }
 
 export async function create(input: GuestInput, userId: string) {

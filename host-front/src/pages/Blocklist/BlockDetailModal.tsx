@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Modal } from '../../components/ui/Modal'
 import { StarDisplay } from '../../components/ui/StarRating'
 import { ApiError, blocklistApi, type BlockDetail } from '../../services/api'
-import { DOCUMENT_LABEL, formatDocument, formatPhone, initials } from '../../utils/documents'
+import { describeDocument, formatPhone, initials } from '../../utils/documents'
 import { formatDate } from '../../utils/money'
 import { formatRating } from '../../utils/rating'
 
@@ -92,7 +92,7 @@ export function BlockDetailModal({ guestId, onClose, onChanged }: BlockDetailMod
       onClose={onClose}
       title={b ? b.guest.fullName : 'Hóspede bloqueado'}
       subtitle={
-        b ? `${DOCUMENT_LABEL[b.guest.documentType]} ${formatDocument(b.guest.documentType, b.guest.documentNumber)}` : undefined
+        b ? describeDocument(b.guest.documentType, b.guest.documentNumber) : undefined
       }
       footer={
         b && (

@@ -78,7 +78,7 @@ export function AssociateInspection() {
       {back}
       <h1 className="ap-title">{r.propertyName}</h1>
       <p className="ap-sub">
-        Hóspede: {r.guestName} · saída {formatDateShort(r.finalCheckOut)}
+        Hóspede: {r.guestName ?? 'não informado'} · saída {formatDateShort(r.finalCheckOut)}
       </p>
 
       {inspected && (

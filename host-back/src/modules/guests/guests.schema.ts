@@ -12,6 +12,7 @@ import {
   onlyDigits,
   UFS,
 } from '../../utils/documents.js';
+import { isEmailShape, normalizeEmail, normalizeName } from '../../utils/text.js';
 
 /** Texto opcional: vazio vira null no banco. */
 const optionalText = (max: number, message = 'Texto muito longo') =>
@@ -22,11 +23,13 @@ const emailValidator = z.email();
 export const guestSchema = z
   .object({
     fullName: z.string().trim().min(3, 'Informe o nome completo').max(160, 'Nome muito longo'),
+    // Hóspede que não informou o documento (LGPD): documentType/documentNumber são ignorados
+    noDocument: z.boolean().optional().default(false),
     personType: z.enum(['PF', 'PJ'], { message: 'Informe se é pessoa física ou jurídica' }),
     isForeign: z.boolean().optional().default(false),
     nationality: optionalText(80, 'Nacionalidade muito longa'),
-    documentType: z.enum(DOCUMENT_TYPES, { message: 'Informe o tipo de identificação' }),
-    documentNumber: z.string().trim().min(1, 'Informe o número de identificação').max(30),
+    documentType: z.enum(DOCUMENT_TYPES, { message: 'Informe o tipo de identificação' }).optional(),
+    documentNumber: z.string().trim().max(30).optional().default(''),
     rg: optionalText(20, 'RG inválido'),
     email: optionalText(160, 'E-mail muito longo'),
     phone: z.string().trim().min(1, 'Informe o telefone').max(25),
@@ -46,21 +49,39 @@ export const guestSchema = z
     const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
     const foreign = g.personType === 'PF' && g.isForeign;
 
-    // PJ: CNPJ | PF brasileiro: CPF | PF estrangeiro: passaporte ou DNI
-    if (g.personType === 'PJ' && g.documentType !== 'CNPJ') issue('documentType', 'Pessoa jurídica deve usar CNPJ');
-    if (g.personType === 'PF' && !foreign && g.documentType !== 'CPF') issue('documentType', 'Hóspede brasileiro usa CPF');
-    if (foreign && g.documentType !== 'PASSAPORTE' && g.documentType !== 'DNI')
-      issue('documentType', 'Hóspede estrangeiro usa passaporte ou DNI');
+    if (g.noDocument) {
+      // Sem documento só para pessoa física (o CNPJ é dado público da empresa)
+      if (g.personType === 'PJ') issue('noDocument', 'Pessoa jurídica deve informar o CNPJ');
+    } else {
+      const type = g.documentType;
+      if (!type) issue('documentType', 'Informe o tipo de identificação');
+      if (!g.documentNumber) issue('documentNumber', 'Informe o número de identificação');
+
+      // PJ: CNPJ | PF brasileiro: CPF | PF estrangeiro: passaporte ou DNI
+      if (type) {
+        if (g.personType === 'PJ' && type !== 'CNPJ') issue('documentType', 'Pessoa jurídica deve usar CNPJ');
+        if (g.personType === 'PF' && !foreign && type !== 'CPF') issue('documentType', 'Hóspede brasileiro usa CPF');
+        if (foreign && type !== 'PASSAPORTE' && type !== 'DNI')
+          issue('documentType', 'Hóspede estrangeiro usa passaporte ou DNI');
+      }
+
+      if (g.documentNumber) {
+        if (type === 'CPF' && !isValidCpf(g.documentNumber)) issue('documentNumber', 'CPF inválido');
+        if (type === 'CNPJ' && !isValidCnpj(g.documentNumber)) issue('documentNumber', 'CNPJ inválido');
+        if ((type === 'PASSAPORTE' || type === 'DNI') && !isValidForeignDocument(g.documentNumber))
+          issue('documentNumber', `${type === 'DNI' ? 'DNI' : 'Passaporte'} deve ter de 5 a 20 letras/números`);
+      }
+    }
 
     if (foreign && g.nationality.length < 2) issue('nationality', 'Informe a nacionalidade');
 
-    if (g.documentType === 'CPF' && !isValidCpf(g.documentNumber)) issue('documentNumber', 'CPF inválido');
-    if (g.documentType === 'CNPJ' && !isValidCnpj(g.documentNumber)) issue('documentNumber', 'CNPJ inválido');
-    if ((g.documentType === 'PASSAPORTE' || g.documentType === 'DNI') && !isValidForeignDocument(g.documentNumber))
-      issue('documentNumber', `${g.documentType === 'DNI' ? 'DNI' : 'Passaporte'} deve ter de 5 a 20 letras/números`);
+    if (normalizeName(g.fullName, g.personType).length < 3) issue('fullName', 'Informe o nome completo');
 
     if (g.rg && !isValidRg(g.rg)) issue('rg', 'RG deve ter de 5 a 14 letras/números');
-    if (g.email && !emailValidator.safeParse(g.email).success) issue('email', 'E-mail inválido');
+    if (g.email) {
+      const email = normalizeEmail(g.email);
+      if (!isEmailShape(email) || !emailValidator.safeParse(email).success) issue('email', 'E-mail inválido');
+    }
 
     const phoneDigits = onlyDigits(g.phone).length;
     if (phoneDigits < 10 || phoneDigits > 15) issue('phone', 'Telefone inválido (inclua o DDD)');
@@ -82,17 +103,19 @@ export const guestSchema = z
       g.addressState,
     ].some(Boolean);
     const orNull = (v: string) => v || null;
+    const hasDocument = !g.noDocument && !!g.documentType;
 
     return {
-      fullName: g.fullName.replace(/\s+/g, ' '),
+      // Nome em MAIÚSCULAS, sem acentos nem caracteres especiais
+      fullName: normalizeName(g.fullName, g.personType),
       personType: g.personType,
       isForeign,
       nationality: isForeign ? g.nationality : 'Brasileira',
-      documentType: g.documentType,
-      documentNumber: normalizeDocument(g.documentType, g.documentNumber),
+      documentType: hasDocument ? g.documentType! : null,
+      documentNumber: hasDocument ? normalizeDocument(g.documentType!, g.documentNumber) : null,
       // RG só faz sentido para pessoa física brasileira
       rg: g.personType === 'PF' && !isForeign && g.rg ? normalizeRg(g.rg) : null,
-      email: g.email ? g.email.toLowerCase() : null,
+      email: g.email ? normalizeEmail(g.email) : null,
       phone: normalizePhone(g.phone),
 
       addressZip: g.addressZip ? (brAddress ? onlyDigits(g.addressZip) : g.addressZip.toUpperCase()) : null,
@@ -113,6 +136,15 @@ export type GuestInput = z.infer<typeof guestSchema>;
 export const checkDocumentSchema = z.object({
   documentType: z.enum(DOCUMENT_TYPES, { message: 'Informe o tipo de identificação' }),
   documentNumber: z.string().trim().min(1, 'Informe o número de identificação').max(30),
+});
+
+/** Consulta de possíveis cadastros duplicados (nome, telefone e e-mail). */
+export const checkDuplicatesSchema = z.object({
+  fullName: z.string().trim().max(160).optional().default(''),
+  personType: z.enum(['PF', 'PJ']).optional().default('PF'),
+  phone: z.string().trim().max(25).optional().default(''),
+  email: z.string().trim().max(160).optional().default(''),
+  excludeId: z.string().uuid().optional(),
 });
 
 export const listQuerySchema = z.object({

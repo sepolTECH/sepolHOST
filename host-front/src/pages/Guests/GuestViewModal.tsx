@@ -3,7 +3,8 @@ import { useId, useState, type ReactNode } from 'react'
 import { Modal } from '../../components/ui/Modal'
 import type { Guest } from '../../services/api'
 import {
-  DOCUMENT_LABEL,
+  describeDocument,
+  documentLabel,
   formatAddress,
   formatDocument,
   formatPhone,
@@ -45,7 +46,7 @@ export function GuestViewModal({ guest, onClose, onEdit, onOpenGuest }: GuestVie
       open={!!guest}
       onClose={onClose}
       title="Dados do hóspede"
-      subtitle={guest ? `${DOCUMENT_LABEL[guest.documentType]} ${formatDocument(guest.documentType, guest.documentNumber)}` : undefined}
+      subtitle={guest ? describeDocument(guest.documentType, guest.documentNumber) : undefined}
       footer={
         guest && (
           <>
@@ -130,9 +131,9 @@ export function GuestViewModal({ guest, onClose, onEdit, onOpenGuest }: GuestVie
               <dl className="guest-view__list">
                 <Item label="Nacionalidade" value={guest.nationality} />
                 <Item
-                  label={DOCUMENT_LABEL[guest.documentType]}
-                  value={formatDocument(guest.documentType, guest.documentNumber)}
-                  mono
+                  label={documentLabel(guest.documentType)}
+                  value={guest.documentType && guest.documentNumber ? formatDocument(guest.documentType, guest.documentNumber) : 'Não informado'}
+                  mono={!!guest.documentNumber}
                 />
                 {guest.rg && <Item label="RG" value={guest.rg} mono />}
                 <Item label="Telefone" value={formatPhone(guest.phone)} />

@@ -2,7 +2,7 @@ import express, { Router } from 'express';
 import { z } from 'zod';
 import { ensureAuth } from '../../middlewares/auth.js';
 import { AppError } from '../../utils/AppError.js';
-import { checkDocumentSchema, guestSchema, listQuerySchema } from './guests.schema.js';
+import { checkDocumentSchema, checkDuplicatesSchema, guestSchema, listQuerySchema } from './guests.schema.js';
 import * as guestsService from './guests.service.js';
 import * as reservationsService from '../reservations/reservations.service.js';
 import * as dependentsService from '../dependents/dependents.service.js';
@@ -28,6 +28,13 @@ guestsRoutes.get('/check-document', async (req, res) => {
   const { documentType, documentNumber } = checkDocumentSchema.parse(req.query);
   const guest = await guestsService.findByDocument(req.user!.sub, documentType, documentNumber);
   res.json({ exists: !!guest, guest });
+});
+
+// Possíveis cadastros duplicados por nome (inclusive abreviado), telefone e e-mail.
+// Usado enquanto o cadastro é preenchido — principalmente para hóspedes sem documento.
+guestsRoutes.get('/check-duplicates', async (req, res) => {
+  const q = checkDuplicatesSchema.parse(req.query);
+  res.json({ matches: await guestsService.findPossibleDuplicates(req.user!.sub, q) });
 });
 
 // Consulta um documento qualquer (CPF, RG, passaporte...): se é hóspede cadastrado e de quem

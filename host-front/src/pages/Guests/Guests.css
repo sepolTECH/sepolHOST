@@ -1159,3 +1159,163 @@
   font-size: 12px;
   color: var(--gray-500);
 }
+
+/* ---------- "Cadastrar sem CPF" (LGPD) ---------- */
+.guest-nodoc {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.guest-nodoc input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--text-strong, var(--text));
+  cursor: pointer;
+}
+.guest-nodoc small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+.guest-nodoc:has(input:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Possíveis cadastros duplicados (nome, telefone, e-mail) ---------- */
+.guest-dups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  font-size: 13px;
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--border-strong, var(--border));
+  border-radius: 8px;
+  animation: guest-exists-in 0.25s ease;
+}
+.guest-dups.is-strong {
+  border-left-color: var(--danger);
+}
+.guest-dups__head {
+  display: flex;
+  gap: 12px;
+}
+.guest-dups__head strong {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.guest-dups__head p {
+  margin: 2px 0 0;
+  color: var(--gray-600);
+}
+.guest-dups__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 50%;
+}
+.guest-dups.is-strong .guest-dups__icon {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.guest-dups__icon svg {
+  width: 17px;
+  height: 17px;
+}
+.guest-dups__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.guest-dups__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.guest-dups__info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-width: 0;
+  color: var(--gray-600);
+}
+.guest-dups__info strong {
+  font-weight: 600;
+  color: var(--text);
+}
+.guest-dups__info .is-match {
+  color: var(--text-strong);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong, var(--border));
+  text-underline-offset: 3px;
+}
+.guest-dups__info small {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.guest-dups__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-basis: 100%;
+  margin-top: 4px;
+}
+.guest-dups__badge {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.guest-dups__confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+.guest-dups__confirm input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--text-strong, var(--text));
+}
+@media (max-width: 640px) {
+  .guest-dups__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

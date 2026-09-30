@@ -11,7 +11,7 @@ type Status = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO';
 interface ReservationRow {
   id: string;
   reservation_number: string;
-  main_guest_id: string;
+  main_guest_id: string | null;
   property_name: string;
   guests_count: number;
   booked_at: string;
@@ -31,9 +31,9 @@ interface ReservationRow {
   created_at: Date;
   updated_at: Date;
   // joins
-  main_guest_name: string;
-  main_guest_document_type: 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ';
-  main_guest_document_number: string;
+  main_guest_name: string | null;
+  main_guest_document_type: 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ' | null;
+  main_guest_document_number: string | null;
   companions_count: number;
   attachments_count: number;
   extensions_count: number;
@@ -87,7 +87,7 @@ const SELECT = `
          cu.name AS created_by_name,
          uu.name AS updated_by_name
     FROM reservations r
-    JOIN guests g ON g.id = r.main_guest_id
+    LEFT JOIN guests g ON g.id = r.main_guest_id
     LEFT JOIN users cu ON cu.id = r.created_by
     LEFT JOIN users uu ON uu.id = r.updated_by`;
 
@@ -98,12 +98,15 @@ function toReservation(r: ReservationRow) {
   return {
     id: r.id,
     reservationNumber: r.reservation_number,
-    mainGuest: {
-      id: r.main_guest_id,
-      fullName: r.main_guest_name,
-      documentType: r.main_guest_document_type,
-      documentNumber: r.main_guest_document_number,
-    },
+    // null = reserva sem hóspede vinculado
+    mainGuest: r.main_guest_id
+      ? {
+          id: r.main_guest_id,
+          fullName: r.main_guest_name ?? '',
+          documentType: r.main_guest_document_type,
+          documentNumber: r.main_guest_document_number,
+        }
+      : null,
     propertyName: r.property_name,
     guestsCount: r.guests_count,
     companionsCount: r.companions_count,
@@ -176,7 +179,7 @@ export async function list(ownerId: string, { search, status, page, pageSize }: 
             COALESCE(SUM(r.amount_cents + r.extensions_cents), 0)::bigint AS amount,
             COALESCE(SUM(r.commission_cents + r.extensions_commission_cents), 0)::bigint AS commission,
             COALESCE(SUM(r.costs_cents), 0)::bigint AS costs
-       FROM reservations r JOIN guests g ON g.id = r.main_guest_id ${whereSql}`,
+       FROM reservations r LEFT JOIN guests g ON g.id = r.main_guest_id ${whereSql}`,
     params,
   );
 
@@ -319,8 +322,8 @@ async function saveChildren(client: PoolClient, reservationId: string, input: Re
       [reservationId, i, c.fullName, c.document, c.ageGroup],
     );
   }
-  // Acompanhantes ficam salvos como dependentes do hóspede responsável
-  await syncFromReservation(client, input.mainGuestId, reservationId, input.companions);
+  // Acompanhantes ficam salvos como dependentes do hóspede responsável (sem responsável, não há de quem ser dependente)
+  if (input.mainGuestId) await syncFromReservation(client, input.mainGuestId, reservationId, input.companions);
   await client.query('DELETE FROM reservation_costs WHERE reservation_id = $1', [reservationId]);
   for (const [i, c] of input.costs.entries()) {
     await client.query(

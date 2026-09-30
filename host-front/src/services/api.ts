@@ -84,6 +84,8 @@ export type DocumentType = 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ'
 /** Dados enviados no cadastro/edição. Campos opcionais vão como string vazia. */
 export interface GuestInput {
   fullName: string
+  /** Hóspede que não informou o documento (LGPD): o documento é ignorado. Só pessoa física. */
+  noDocument: boolean
   personType: PersonType
   isForeign: boolean
   nationality: string
@@ -103,6 +105,15 @@ export interface GuestInput {
   notes: string
 }
 
+export type DuplicateField = 'name' | 'phone' | 'email'
+
+/** Cadastro existente que pode ser a mesma pessoa que está sendo cadastrada. */
+export interface DuplicateMatch {
+  guest: Guest
+  matchedOn: DuplicateField[]
+  exactName: boolean
+}
+
 /** Campos opcionais que a API devolve como null quando vazios. */
 type OptionalGuestField =
   | 'rg'
@@ -117,9 +128,12 @@ type OptionalGuestField =
   | 'addressCountry'
   | 'notes'
 
-export type Guest = Omit<GuestInput, OptionalGuestField> & {
+export type Guest = Omit<GuestInput, OptionalGuestField | 'noDocument' | 'documentType' | 'documentNumber'> & {
   [K in OptionalGuestField]: string | null
 } & {
+  /** null = hóspede cadastrado sem documento */
+  documentType: DocumentType | null
+  documentNumber: string | null
   id: string
   hasDocumentPhoto: boolean
   documentPhotoMime: string | null
@@ -186,6 +200,17 @@ export const guestsApi = {
       `/guests/check-document?${new URLSearchParams({ documentType, documentNumber })}`,
       { signal },
     ),
+  /** Possíveis cadastros duplicados por nome (inclusive abreviado), telefone e e-mail. */
+  checkDuplicates: (
+    params: { fullName: string; personType: PersonType; phone: string; email: string; excludeId?: string },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) qs.set(k, v)
+    })
+    return api<{ matches: DuplicateMatch[] }>(`/guests/check-duplicates?${qs}`, { signal })
+  },
   create: (input: GuestInput) =>
     api<{ guest: Guest }>('/guests', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: string, input: GuestInput) =>
@@ -311,7 +336,7 @@ export interface Companion {
 
 export interface ReservationInput {
   reservationNumber: string
-  mainGuestId: string
+  mainGuestId: string | null // null = reserva sem hóspede vinculado
   propertyName: string
   guestsCount: number
   companions: Companion[]
@@ -332,14 +357,14 @@ export interface ReservationInput {
 export interface MainGuest {
   id: string
   fullName: string
-  documentType: DocumentType
-  documentNumber: string
+  documentType: DocumentType | null
+  documentNumber: string | null
 }
 
 export interface Reservation {
   id: string
   reservationNumber: string
-  mainGuest: MainGuest
+  mainGuest: MainGuest | null // null = reserva sem hóspede vinculado
   propertyName: string
   guestsCount: number
   companionsCount: number
@@ -483,8 +508,8 @@ export interface ReviewItem {
   guest: {
     id: string
     fullName: string
-    documentType: DocumentType
-    documentNumber: string
+    documentType: DocumentType | null
+    documentNumber: string | null
     averageRating: number | null // média do hóspede em todas as reservas avaliadas
     reviewsCount: number
     blocked: GuestBlock | null
@@ -527,8 +552,8 @@ export interface BlockEntry {
   guest: {
     id: string
     fullName: string
-    documentType: DocumentType
-    documentNumber: string
+    documentType: DocumentType | null
+    documentNumber: string | null
     phone: string
     email: string | null
     averageRating: number | null
@@ -597,7 +622,7 @@ export interface FinanceStay {
   id: string
   reservationNumber: string
   propertyName: string
-  mainGuest: { id: string; fullName: string }
+  mainGuest: { id: string; fullName: string } | null
   platform: Platform | null
   status: ReservationStatus
   checkIn: string
@@ -696,7 +721,7 @@ interface ClosingStayBase {
   id: string
   reservationNumber: string
   propertyName: string
-  mainGuest: { id: string; fullName: string }
+  mainGuest: { id: string; fullName: string } | null
   platform: Platform | null
   status: ReservationStatus
   checkIn: string
@@ -854,7 +879,7 @@ export interface CalendarLinkedReservation {
   checkOut: string
   status: ReservationStatus
   platform: Platform | null
-  guest: { id: string; fullName: string; phone: string | null }
+  guest: { id: string; fullName: string; phone: string | null } | null
 }
 
 export interface CalendarEvent {
@@ -958,7 +983,7 @@ export interface InspectionRow {
   id: string
   reservationNumber: string
   propertyName: string
-  guestName: string
+  guestName: string | null
   checkIn: string
   finalCheckOut: string
   status: ReservationStatus
@@ -997,7 +1022,7 @@ export interface ReservationInventory {
     id: string
     reservationNumber: string
     propertyName: string
-    guestName: string
+    guestName: string | null
     checkIn: string
     finalCheckOut: string
     status: ReservationStatus
@@ -1108,11 +1133,12 @@ export interface AssociateReservationRow {
   id: string
   reservationNumber: string
   propertyName: string
-  guestName: string
+  guestName: string | null
   checkIn: string
   finalCheckOut: string
   status: ReservationStatus
   inventoryStatus: InventoryStatus
+  hasGuest: boolean // sem hóspede vinculado não há avaliação a fazer
   reviewed: boolean
   itemsCount: number
   checkedCount: number
@@ -1130,7 +1156,7 @@ export interface AssociateInventory {
     id: string
     reservationNumber: string
     propertyName: string
-    guestName: string
+    guestName: string | null
     checkIn: string
     finalCheckOut: string
     inventoryStatus: InventoryStatus

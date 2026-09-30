@@ -2,7 +2,7 @@ import { ShieldAlert, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { guestsApi, type DocumentLookup } from '../../services/api'
-import { DOCUMENT_LABEL, formatDocument } from '../../utils/documents'
+import { describeDocument } from '../../utils/documents'
 import { BlockedAlert } from './BlockedAlert'
 import './BlockedAlert.css'
 
@@ -89,8 +89,7 @@ export function DependentNotice({
                 <li key={dependentId}>
                   <p className="blocked-alert__reason">
                     {dependentName} foi cadastrado como dependente de <b>{mainGuest.fullName}</b> (
-                    {DOCUMENT_LABEL[mainGuest.documentType]}{' '}
-                    {formatDocument(mainGuest.documentType, mainGuest.documentNumber)}), que está bloqueado
+                    {describeDocument(mainGuest.documentType, mainGuest.documentNumber)}), que está bloqueado
                     {mainGuest.blocked && !compact && <>: {mainGuest.blocked.reason}</>}
                   </p>
                   {mainGuest.blocked && (

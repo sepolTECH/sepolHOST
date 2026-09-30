@@ -267,8 +267,8 @@ interface ReservationRow {
   final_check_out: string;
   status: 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO';
   platform: Platform | null;
-  guest_id: string;
-  guest_name: string;
+  guest_id: string | null;
+  guest_name: string | null;
   guest_phone: string | null;
 }
 
@@ -276,7 +276,7 @@ const RESERVATION_SELECT = `
   SELECT r.id, r.reservation_number, r.property_name, r.guests_count, r.check_in, r.final_check_out,
          r.status, r.platform, g.id AS guest_id, g.full_name AS guest_name, g.phone AS guest_phone
     FROM reservations r
-    JOIN guests g ON g.id = r.main_guest_id`;
+    LEFT JOIN guests g ON g.id = r.main_guest_id`;
 
 /** Identificador estável da marcação dentro do link: o UID do iCal (ou as datas, se a plataforma não mandar UID). */
 const eventKeyOf = (ev: IcalEvent) => ev.uid ?? `${ev.start}|${ev.end}`;
@@ -290,7 +290,7 @@ const toLinked = (r: ReservationRow) => ({
   checkOut: r.final_check_out,
   status: r.status,
   platform: r.platform,
-  guest: { id: r.guest_id, fullName: r.guest_name, phone: r.guest_phone },
+  guest: r.guest_id ? { id: r.guest_id, fullName: r.guest_name ?? '', phone: r.guest_phone } : null,
 });
 
 const nightsBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);

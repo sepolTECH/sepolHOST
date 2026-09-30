@@ -170,7 +170,7 @@ export function InspectionsTab({ onNotify }: InspectionsTabProps) {
                           <td data-label="Reserva">
                             <span className="guest-form__mono">{r.reservationNumber}</span>
                           </td>
-                          <td data-label="Hóspede">{r.guestName}</td>
+                          <td data-label="Hóspede">{r.guestName ?? <span style={{ color: 'var(--gray-500)' }}>Sem hóspede</span>}</td>
                           <td data-label="Imóvel">{r.propertyName}</td>
                           <td data-label="Check-out" className="nowrap">
                             <span className="doc-cell">

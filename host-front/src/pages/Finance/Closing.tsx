@@ -455,7 +455,7 @@ function StayCells({ stay: r }: { stay: ClosingStay | ClosingCostStay }) {
       </td>
       <td data-label="Hóspede">
         <span className="doc-cell">
-          <span className="finance__name">{r.mainGuest.fullName}</span>
+          <span className="finance__name">{r.mainGuest?.fullName ?? 'Sem hóspede'}</span>
           <small>{r.propertyName}</small>
         </span>
       </td>

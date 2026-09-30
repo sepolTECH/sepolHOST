@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { StarDisplay } from '../../components/ui/StarRating'
 import { blocklistApi, type BlockEntry, type Paginated } from '../../services/api'
-import { DOCUMENT_LABEL, formatDocument, initials } from '../../utils/documents'
+import { describeDocument, initials } from '../../utils/documents'
 import '../Guests/Guests.css'
 import '../Reservations/Reservations.css'
 import '../Reviews/Reviews.css'
@@ -163,8 +163,7 @@ export function Blocklist() {
                             <span className="guest-cell__text">
                               <span className="guest-cell__name">{b.guest.fullName}</span>
                               <small className="guest-cell__norating">
-                                {DOCUMENT_LABEL[b.guest.documentType]}{' '}
-                                {formatDocument(b.guest.documentType, b.guest.documentNumber)}
+                                {describeDocument(b.guest.documentType, b.guest.documentNumber)}
                               </small>
                             </span>
                           </div>

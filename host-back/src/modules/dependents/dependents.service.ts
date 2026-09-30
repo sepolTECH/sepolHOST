@@ -34,7 +34,9 @@ export async function syncFromReservation(
        SELECT $1::uuid, $2::text, $3::text, dependent_doc_key($3::text), dependent_dedupe_key($2::text, $3::text),
               $4::text, $5::uuid
         -- o próprio responsável não vira dependente dele mesmo
-        WHERE dependent_doc_key($3::text) IS DISTINCT FROM (SELECT document_number FROM guests WHERE id = $1::uuid)
+        -- (dependente sem documento sempre entra: o responsável pode não ter documento também)
+        WHERE dependent_doc_key($3::text) IS NULL
+           OR dependent_doc_key($3::text) IS DISTINCT FROM (SELECT document_number FROM guests WHERE id = $1::uuid)
        ON CONFLICT (main_guest_id, dedupe_key) DO UPDATE
           SET full_name           = EXCLUDED.full_name,
               document            = COALESCE(EXCLUDED.document, guest_dependents.document),
@@ -116,8 +118,8 @@ interface LookupRow extends BlockColumnsRow {
   dependent_updated_at: Date;
   main_guest_id: string;
   main_guest_name: string;
-  main_guest_document_type: DocumentType;
-  main_guest_document_number: string;
+  main_guest_document_type: DocumentType | null;
+  main_guest_document_number: string | null;
 }
 
 /**

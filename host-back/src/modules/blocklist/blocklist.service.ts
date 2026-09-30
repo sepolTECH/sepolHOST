@@ -8,8 +8,8 @@ type DocumentType = 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ';
 interface BlockRow {
   guest_id: string;
   full_name: string;
-  document_type: DocumentType;
-  document_number: string;
+  document_type: DocumentType | null;
+  document_number: string | null;
   phone: string;
   email: string | null;
   reason: string;

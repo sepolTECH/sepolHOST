@@ -158,7 +158,7 @@ export function ReleaseModal({ associate, onClose, onNotify }: ReleaseModalProps
                     <span className="assoc__res-main">
                       <strong>{r.propertyName}</strong>
                       <span>
-                        Reserva {r.reservationNumber} · {r.mainGuest.fullName}
+                        Reserva {r.reservationNumber} · {r.mainGuest?.fullName ?? 'Sem hóspede'}
                       </span>
                     </span>
                     <span className="assoc__res-dates">

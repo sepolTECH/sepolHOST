@@ -352,7 +352,7 @@ export function Reservations() {
                         </td>
                         <td data-label="Hóspede">
                           <span className="res-guest">
-                            <span>{r.mainGuest.fullName}</span>
+                            <span>{r.mainGuest?.fullName ?? <span style={{ color: 'var(--gray-500)' }}>Sem hóspede</span>}</span>
                             {r.guestsCount > 1 && <small>+{r.guestsCount - 1}</small>}
                           </span>
                         </td>

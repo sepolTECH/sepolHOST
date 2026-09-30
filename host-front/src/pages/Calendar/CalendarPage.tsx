@@ -118,7 +118,7 @@ export function Calendar() {
           (!property || (property === NO_PROPERTY ? !e.propertyName : e.propertyName === property)) &&
           (linkFilter === 'ALL' || (linkFilter === 'LINKED' ? !!e.reservation : e.kind === 'RESERVA' && !e.reservation)) &&
           (!term ||
-            [e.guestName, e.reservationCode, e.reservation?.reservationNumber, e.reservation?.guest.fullName, e.feedName]
+            [e.guestName, e.reservationCode, e.reservation?.reservationNumber, e.reservation?.guest?.fullName, e.feedName]
               .some((v) => v && normalize(v).includes(term))),
       ),
     [data, showBlocks, hiddenPlatforms, property, linkFilter, term],

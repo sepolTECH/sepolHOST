@@ -31,7 +31,9 @@ export async function listReservations(ownerId: string, associateId: string) {
     id: string;
     reservation_number: string;
     property_name: string;
-    guest_name: string;
+    guest_name: string | null;
+    // sem hóspede vinculado não há o que avaliar (a avaliação é do hóspede)
+    has_guest: boolean;
     check_in: string;
     final_check_out: string;
     status: 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO';
@@ -42,6 +44,7 @@ export async function listReservations(ownerId: string, associateId: string) {
   }>(
     `SELECT r.id, r.reservation_number, r.property_name, g.full_name AS guest_name,
             r.check_in, r.final_check_out, r.status, r.inventory_status,
+            (r.main_guest_id IS NOT NULL) AS has_guest,
             (rv.id IS NOT NULL) AS reviewed,
             CASE WHEN r.inventory_loaded
                  THEN (SELECT COUNT(*) FROM reservation_inventory_items x WHERE x.reservation_id = r.id)
@@ -54,10 +57,10 @@ export async function listReservations(ownerId: string, associateId: string) {
             END::int AS checked_count
        FROM associate_reservation_access a
        JOIN reservations r ON r.id = a.reservation_id
-       JOIN guests g ON g.id = r.main_guest_id
+       LEFT JOIN guests g ON g.id = r.main_guest_id
        LEFT JOIN reservation_reviews rv ON rv.reservation_id = r.id
       WHERE a.associate_id = $1 AND r.owner_id = $2
-      ORDER BY (r.inventory_status = 'VISTORIADO' AND rv.id IS NOT NULL), r.final_check_out DESC, r.created_at DESC`,
+      ORDER BY (r.inventory_status = 'VISTORIADO' AND (rv.id IS NOT NULL OR r.main_guest_id IS NULL)), r.final_check_out DESC, r.created_at DESC`,
     [associateId, ownerId],
   );
 
@@ -71,6 +74,7 @@ export async function listReservations(ownerId: string, associateId: string) {
       finalCheckOut: r.final_check_out,
       status: r.status,
       inventoryStatus: r.inventory_status,
+      hasGuest: r.has_guest,
       reviewed: r.reviewed,
       itemsCount: r.items_count,
       checkedCount: r.checked_count,

@@ -69,7 +69,11 @@ const daysBetween = (from: string, to: string) =>
 export const reservationSchema = z
   .object({
     reservationNumber: z.string().trim().min(1, 'Informe o número da reserva').max(40, 'Número muito longo'),
-    mainGuestId: z.string({ message: 'Selecione o hóspede responsável' }).uuid('Selecione o hóspede responsável'),
+    // Hóspede responsável é opcional: a reserva pode existir sem uma pessoa vinculada
+    mainGuestId: z
+      .union([z.string().uuid('Hóspede responsável inválido'), z.literal(''), z.null()])
+      .optional()
+      .transform((v) => v || null),
     propertyName: z.string().trim().min(2, 'Informe o imóvel').max(120, 'Nome do imóvel muito longo'),
     guestsCount: z.coerce
       .number({ message: 'Informe o número de hóspedes' })

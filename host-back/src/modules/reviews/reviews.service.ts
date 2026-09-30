@@ -14,8 +14,8 @@ interface Row extends BlockColumnsRow {
   guests_count: number;
   guest_id: string;
   guest_name: string;
-  guest_document_type: 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ';
-  guest_document_number: string;
+  guest_document_type: 'CPF' | 'PASSAPORTE' | 'DNI' | 'CNPJ' | null;
+  guest_document_number: string | null;
   guest_avg: number | null;
   guest_reviews: number;
   // avaliação (nulos quando a reserva ainda não foi avaliada)

@@ -24,8 +24,8 @@ interface Row {
   id: string;
   reservation_number: string;
   property_name: string;
-  main_guest_id: string;
-  main_guest_name: string;
+  main_guest_id: string | null;
+  main_guest_name: string | null;
   platform: Platform | null;
   status: Status;
   check_in: string;
@@ -81,7 +81,7 @@ async function computeMonth(ownerId: string, year: number, month: number) {
             r.amount_cents::float8 AS amount_cents, r.commission_cents::float8 AS commission_cents, r.costs_cents::float8 AS costs_cents,
             r.extensions_cents::float8 AS extensions_cents, r.extensions_commission_cents::float8 AS extensions_commission_cents
        FROM reservations r
-       JOIN guests g ON g.id = r.main_guest_id
+       LEFT JOIN guests g ON g.id = r.main_guest_id
       WHERE r.owner_id = $3 AND r.check_in < $2::date AND r.final_check_out >= $1::date
       ORDER BY r.check_in, r.created_at`,
     [start, end, ownerId],
@@ -129,7 +129,7 @@ async function computeMonth(ownerId: string, year: number, month: number) {
       id: r.id,
       reservationNumber: r.reservation_number,
       propertyName: r.property_name,
-      mainGuest: { id: r.main_guest_id, fullName: r.main_guest_name },
+      mainGuest: r.main_guest_id ? { id: r.main_guest_id, fullName: r.main_guest_name ?? '' } : null,
       platform: r.platform,
       status: r.status,
       checkIn: r.check_in,

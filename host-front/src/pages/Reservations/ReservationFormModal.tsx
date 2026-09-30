@@ -17,7 +17,7 @@ import {
   type ReservationInput,
   type ReservationStatus,
 } from '../../services/api'
-import { DOCUMENT_LABEL, formatDocument } from '../../utils/documents'
+import { describeDocument } from '../../utils/documents'
 import {
   addDaysIso,
   centsFromInput,
@@ -205,7 +205,6 @@ function commissionOf(v: FormValues) {
 function validate(v: FormValues): Errors {
   const e: Errors = {}
   // na mesma ordem em que aparecem na tela (o foco vai para o primeiro erro)
-  if (!v.mainGuest) e.mainGuestId = 'Selecione o hóspede responsável'
   if (!v.reservationNumber.trim()) e.reservationNumber = 'Informe o número da reserva'
   if (v.propertyName.trim().length < 2) e.propertyName = 'Informe o imóvel'
   if (!v.platform) e.platform = 'Selecione a plataforma de origem'
@@ -456,7 +455,7 @@ export function ReservationFormModal({
 
     const payload: ReservationInput = {
       reservationNumber: values.reservationNumber.trim(),
-      mainGuestId: values.mainGuest!.id,
+      mainGuestId: values.mainGuest?.id ?? null,
       propertyName: values.propertyName.trim(),
       guestsCount: values.guestsCount,
       companions: values.companions.map((c) => ({
@@ -584,7 +583,7 @@ export function ReservationFormModal({
           <div className="guest-form__grid">
             <div className={cls('mainGuestId', 'ui-field--full')}>
               <label htmlFor={idOf('mainGuestId')}>
-                Hóspede responsável<span className="req">*</span>
+                Hóspede responsável <span className="guest-form__optional">opcional</span>
               </label>
               <GuestPicker
                 id={idOf('mainGuestId')}
@@ -594,7 +593,11 @@ export function ReservationFormModal({
                 describedBy={errors.mainGuestId ? `${idOf('mainGuestId')}-error` : undefined}
                 onChange={(g) => update({ mainGuest: g }, ['mainGuestId'])}
               />
-              {err('mainGuestId')}
+              {err('mainGuestId') ?? (
+                !values.mainGuest && (
+                  <p className="ui-field__hint">Pode cadastrar a reserva sem hóspede e vincular depois, editando-a.</p>
+                )
+              )}
             </div>
 
             <div className={cls('reservationNumber')}>
@@ -941,16 +944,13 @@ export function ReservationFormModal({
                 {values.mainGuest ? (
                   <>
                     <strong>{values.mainGuest.fullName}</strong>
-                    <small>
-                      {DOCUMENT_LABEL[values.mainGuest.documentType]}{' '}
-                      {formatDocument(values.mainGuest.documentType, values.mainGuest.documentNumber)}
-                    </small>
+                    <small>{describeDocument(values.mainGuest.documentType, values.mainGuest.documentNumber)}</small>
                   </>
                 ) : (
-                  <span className="companion__placeholder">Selecione o hóspede responsável acima</span>
+                  <span className="companion__placeholder">Sem hóspede vinculado (opcional)</span>
                 )}
               </div>
-              <span className="ui-badge ui-badge--dark">Responsável</span>
+              {values.mainGuest && <span className="ui-badge ui-badge--dark">Responsável</span>}
             </li>
 
             {values.companions.map((c, i) => (

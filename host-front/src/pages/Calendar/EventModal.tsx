@@ -51,7 +51,7 @@ export function EventModal({ event: e, onClose, onLinkChanged }: Props) {
     try {
       await calendarApi.link(e.feedId, e.eventKey, candidate.id)
       setPicking(false)
-      onLinkChanged(`Vinculado a ${candidate.guest.fullName}`)
+      onLinkChanged(`Vinculado a ${candidate.guest?.fullName ?? `reserva ${candidate.reservationNumber}`}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível vincular')
     } finally {
@@ -124,7 +124,7 @@ export function EventModal({ event: e, onClose, onLinkChanged }: Props) {
                   <UserRound strokeWidth={1.7} />
                 </span>
                 <div>
-                  <strong>{r.guest.fullName}</strong>
+                  <strong>{r.guest?.fullName ?? 'Reserva sem hóspede vinculado'}</strong>
                   <small>
                     {e.linkSource === 'MANUAL'
                       ? 'Vinculado por você'
@@ -145,7 +145,7 @@ export function EventModal({ event: e, onClose, onLinkChanged }: Props) {
                 <Item label="Nº da reserva" value={r.reservationNumber} mono />
                 <Item label="Status" value={STATUS_LABEL[r.status]} />
                 <Item label="Hóspedes" value={String(r.guestsCount)} />
-                {r.guest.phone && <Item label="Telefone" value={r.guest.phone} />}
+                {r.guest?.phone && <Item label="Telefone" value={r.guest.phone} />}
                 <Item label="Imóvel" value={r.propertyName} full />
               </dl>
               <div className="cal-link__actions">
@@ -288,7 +288,7 @@ function LinkPicker({
                 disabled={busy || c.id === current}
               >
                 <span className="cal-link__option-main">
-                  <strong>{c.guest.fullName}</strong>
+                  <strong>{c.guest?.fullName ?? 'Sem hóspede vinculado'}</strong>
                   <small>
                     <span className="guest-form__mono">{c.reservationNumber}</span>
                     {c.platform ? ` · ${PLATFORM_LABEL[c.platform]}` : ''} · {c.propertyName}
