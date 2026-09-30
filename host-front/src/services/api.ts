@@ -143,6 +143,7 @@ export type Guest = Omit<GuestInput, OptionalGuestField | 'noDocument' | 'docume
   updatedByName: string | null
   averageRating: number | null // média das avaliações internas (null = sem avaliações)
   reviewsCount: number
+  reservationsCount: number // reservas em que é o responsável (ficam sem hóspede se ele for excluído)
   blocked: GuestBlock | null // bloqueio (null = não bloqueado)
 }
 
@@ -200,6 +201,9 @@ export const guestsApi = {
       `/guests/check-document?${new URLSearchParams({ documentType, documentNumber })}`,
       { signal },
     ),
+  /** Exclui o hóspede. Com reservas vinculadas é preciso confirmar (elas ficam sem hóspede). */
+  remove: (id: string, detachReservations = false) =>
+    api<void>(`/guests/${id}?detachReservations=${detachReservations}`, { method: 'DELETE' }),
   /** Possíveis cadastros duplicados por nome (inclusive abreviado), telefone e e-mail. */
   checkDuplicates: (
     params: { fullName: string; personType: PersonType; phone: string; email: string; excludeId?: string },
@@ -432,6 +436,8 @@ export const reservationsApi = {
       `/reservations/${id}/attachments?${new URLSearchParams({ category, name: file.name })}`,
       { method: 'POST', body: file, headers: { 'Content-Type': file.type } },
     ),
+  /** Exclui a reserva (acompanhantes, custos, anexos, avaliação e inventário saem junto). */
+  remove: (id: string) => api<void>(`/reservations/${id}`, { method: 'DELETE' }),
   removeAttachment: (id: string, attachmentId: string) =>
     api<void>(`/reservations/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
   getAttachment: (id: string, attachmentId: string, signal?: AbortSignal) =>

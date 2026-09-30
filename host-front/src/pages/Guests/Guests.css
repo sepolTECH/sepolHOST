@@ -1319,3 +1319,10 @@
     align-items: stretch;
   }
 }
+
+/* ---------- Botão de excluir nas tabelas ---------- */
+.icon-btn--danger:hover,
+.icon-btn--danger:focus-visible {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}

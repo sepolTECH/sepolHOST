@@ -1,4 +1,4 @@
-import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Eye, Paperclip, Pencil, Plus, Search, Star, UserCheck } from 'lucide-react'
+import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Eye, Paperclip, Pencil, Plus, Search, Star, Trash2, UserCheck } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Segmented } from '../../components/ui/Segmented'
@@ -197,6 +197,27 @@ export function Reservations() {
     }
     // recarrega para atualizar ordem e somatórios
     setReloadKey((k) => k + 1)
+  }
+
+  async function handleDelete(r: Reservation) {
+    const ok = window.confirm(
+      [
+        `Excluir a reserva ${r.reservationNumber}?`,
+        'Serão apagados também os acompanhantes, custos, extensões, anexos, a avaliação e o inventário/vistoria desta reserva, além do vínculo dela com o calendário. O hóspede não é excluído.',
+        'Esta ação não pode ser desfeita.',
+      ].join('\n\n'),
+    )
+    if (!ok) return
+    try {
+      await reservationsApi.remove(r.id)
+      showToast('Reserva excluída')
+      setViewing(null)
+      // era a última da página: volta uma página
+      if (result && result.data.length === 1 && page > 1) setPage((p) => p - 1)
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Não foi possível excluir a reserva')
+    }
   }
 
   const total = result?.total ?? 0
@@ -410,15 +431,18 @@ export function Reservations() {
                           >
                             <Pencil strokeWidth={1.8} />
                           </button>
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            onClick={() => navigate(`/avaliacoes?reserva=${r.id}`)}
-                            aria-label={`Avaliar hospedagem da reserva ${r.reservationNumber}`}
-                            title="Avaliar hospedagem"
-                          >
-                            <Star strokeWidth={1.8} />
-                          </button>
+                          {/* A avaliação é do hóspede: sem hóspede vinculado não há o que avaliar */}
+                          {r.mainGuest && (
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => navigate(`/avaliacoes?reserva=${r.id}`)}
+                              aria-label={`Avaliar hospedagem da reserva ${r.reservationNumber}`}
+                              title="Avaliar hospedagem"
+                            >
+                              <Star strokeWidth={1.8} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="icon-btn"
@@ -427,6 +451,15 @@ export function Reservations() {
                             title="Liberar para associados"
                           >
                             <UserCheck strokeWidth={1.8} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-btn icon-btn--danger"
+                            onClick={() => handleDelete(r)}
+                            aria-label={`Excluir reserva ${r.reservationNumber}`}
+                            title="Excluir"
+                          >
+                            <Trash2 strokeWidth={1.8} />
                           </button>
                         </td>
                       </tr>

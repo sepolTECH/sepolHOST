@@ -1,9 +1,9 @@
-import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, UserRound } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Trash2, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Segmented } from '../../components/ui/Segmented'
 import { BlockedBadge } from '../../components/ui/BlockedBadge'
 import { StarDisplay } from '../../components/ui/StarRating'
-import { guestsApi, type Guest, type Paginated, type PersonType } from '../../services/api'
+import { ApiError, guestsApi, type Guest, type Paginated, type PersonType } from '../../services/api'
 import { DOCUMENT_LABEL, formatDocument, formatPhone, initials } from '../../utils/documents'
 import { GuestFormModal } from './GuestFormModal'
 import { GuestViewModal } from './GuestViewModal'
@@ -90,6 +90,29 @@ export function Guests() {
       setReloadKey((k) => k + 1)
     } else {
       setResult((r) => r && { ...r, data: r.data.map((g) => (g.id === saved.id ? saved : g)) })
+    }
+  }
+
+  async function handleDelete(g: Guest) {
+    const n = g.reservationsCount ?? 0
+    const warnings = [`Excluir o hóspede ${g.fullName}?`]
+    if (n > 0)
+      warnings.push(
+        `Ele é o responsável por ${n} reserva${n > 1 ? 's' : ''}. ${n > 1 ? 'Elas não serão apagadas, mas ficarão' : 'Ela não será apagada, mas ficará'} sem hóspede vinculado.`,
+      )
+    if (g.blocked) warnings.push('Ele também será removido da lista de bloqueados.')
+    warnings.push('Esta ação não pode ser desfeita.')
+    if (!window.confirm(warnings.join('\n\n'))) return
+
+    try {
+      await guestsApi.remove(g.id, n > 0)
+      showToast('Hóspede excluído')
+      setViewing(null)
+      // era o último da página: volta uma página
+      if (result && result.data.length === 1 && page > 1) setPage((p) => p - 1)
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Não foi possível excluir o hóspede')
     }
   }
 
@@ -268,6 +291,15 @@ export function Guests() {
                             title="Editar"
                           >
                             <Pencil strokeWidth={1.8} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-btn icon-btn--danger"
+                            onClick={() => handleDelete(g)}
+                            aria-label={`Excluir ${g.fullName}`}
+                            title="Excluir"
+                          >
+                            <Trash2 strokeWidth={1.8} />
                           </button>
                         </td>
                       </tr>
