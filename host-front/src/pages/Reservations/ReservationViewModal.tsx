@@ -69,10 +69,10 @@ export function ReservationViewModal({ reservation: r, onClose, onEdit, onExtend
           <dl className="guest-view__list">
             <Item label="Imóvel" value={r.propertyName} />
             <Item label="Data da reserva" value={formatDate(r.bookedAt)} />
-            <Item label="Check-in" value={formatDate(r.checkIn)} />
+            <Item label="Check-in" value={`${formatDate(r.checkIn)}${r.checkInTime ? ` às ${r.checkInTime}` : ''}`} />
             <Item
               label={r.extensionsCount > 0 ? 'Check-out original' : 'Check-out'}
-              value={formatDate(r.checkOut)}
+              value={`${formatDate(r.checkOut)}${r.checkOutTime && r.extensionsCount === 0 ? ` às ${r.checkOutTime}` : ''}`}
             />
             <Item label="Plataforma de origem" value={r.platform ? PLATFORM_LABEL[r.platform] : 'Não informada'} />
             <Item label="Forma de pagamento" value={r.paymentMethod ? PAYMENT_LABEL[r.paymentMethod] : 'Não informada'} />
@@ -152,16 +152,33 @@ export function ReservationViewModal({ reservation: r, onClose, onEdit, onExtend
               <span className="guest-form__mono">{formatMoney(r.amountCents)}</span>
             </div>
             {r.extensionsCents > 0 && (
-              <>
-                <div className="summary__row summary__row--plus">
-                  <span>Extensões</span>
-                  <span className="guest-form__mono">+ {formatMoney(r.extensionsCents)}</span>
-                </div>
-                <div className="summary__row summary__row--subtotal">
-                  <span>Valor bruto</span>
-                  <span className="guest-form__mono">{formatMoney(r.grossCents)}</span>
-                </div>
-              </>
+              <div className="summary__row summary__row--plus">
+                <span>Extensões</span>
+                <span className="guest-form__mono">+ {formatMoney(r.extensionsCents)}</span>
+              </div>
+            )}
+            {(r.additions?.length ?? 0) > 0 && (
+              <div className="summary__row summary__row--plus summary__row--group">
+                <span>Valores adicionais</span>
+                <span className="guest-form__mono">+ {formatMoney(r.additionsCents)}</span>
+                <ul className="summary__items">
+                  {r.additions!.map((a, i) => (
+                    <li key={a.id ?? i}>
+                      <span>
+                        {a.description}
+                        {a.kind === 'HORAS' && a.hours ? ` · ${String(a.hours).replace('.', ',')} h` : ''}
+                      </span>
+                      <span className="guest-form__mono">{formatMoney(a.amountCents)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(r.extensionsCents > 0 || (r.additions?.length ?? 0) > 0) && (
+              <div className="summary__row summary__row--subtotal">
+                <span>Valor bruto</span>
+                <span className="guest-form__mono">{formatMoney(r.grossCents)}</span>
+              </div>
             )}
             <div className="summary__row summary__row--minus">
               <span>

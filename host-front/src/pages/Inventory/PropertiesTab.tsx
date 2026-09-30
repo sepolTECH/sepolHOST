@@ -1,5 +1,6 @@
 import { Building2, Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   inventoryApi,
   type InventoryItemInput,
@@ -9,15 +10,14 @@ import {
 import { formatMoney } from '../../utils/money'
 import { ItemsEditor } from './ItemsEditor'
 
-/** Aba "Itens do imóvel": cadastro do inventário que é copiado para cada nova reserva. */
+/**
+ * Aba "Itens do imóvel": cadastro do inventário que é copiado para cada nova reserva.
+ * Os imóveis vêm do cadastro em Ajustes › Imóveis.
+ */
 export function PropertiesTab() {
+  const navigate = useNavigate()
   const [properties, setProperties] = useState<InventoryProperty[] | null>(null)
   const [selected, setSelected] = useState('')
-  // Imóvel digitado ainda sem itens (só passa a existir no banco quando o 1º item é salvo)
-  const [draftProperty, setDraftProperty] = useState('')
-  const [newMode, setNewMode] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newError, setNewError] = useState('')
   const [loadError, setLoadError] = useState('')
 
   const [items, setItems] = useState<PropertyInventoryItem[]>([])
@@ -74,34 +74,6 @@ export function PropertiesTab() {
     }
   }, [selected])
 
-  const options = useMemo(() => {
-    const list = [...(properties ?? [])]
-    if (draftProperty && !list.some((p) => p.name.trim().toLowerCase() === draftProperty.trim().toLowerCase())) {
-      list.push({ name: draftProperty, itemsCount: 0, totalCents: 0, reservationsCount: 0 })
-    }
-    return list.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-  }, [properties, draftProperty])
-
-  function submitNewProperty(e: FormEvent) {
-    e.preventDefault()
-    const name = newName.trim().replace(/\s+/g, ' ')
-    if (name.length < 2) {
-      setNewError('Informe o nome do imóvel')
-      return
-    }
-    // Se já existe (mesmo com outra caixa), seleciona o existente
-    const existing = options.find((p) => p.name.trim().toLowerCase() === name.toLowerCase())
-    if (existing) {
-      setSelected(existing.name)
-    } else {
-      setDraftProperty(name)
-      setSelected(name)
-    }
-    setNewMode(false)
-    setNewName('')
-    setNewError('')
-  }
-
   async function refresh() {
     await Promise.all([loadItems(selected), loadProperties()])
   }
@@ -121,62 +93,33 @@ export function PropertiesTab() {
 
   const ready = itemsKey === selected
   const unitCount = items.reduce((sum, i) => sum + i.quantity, 0)
+  const options = properties ?? []
   const current = options.find((p) => p.name === selected)
 
   return (
     <>
       <div className="inv-toolbar">
-        {newMode ? (
-          <form className="inv-newprop" onSubmit={submitNewProperty} noValidate>
-            <div className="ui-field">
-              <label htmlFor="inv-newprop">Nome do imóvel</label>
-              <input
-                id="inv-newprop"
-                className="ui-input"
-                placeholder="Igual ao nome usado nas reservas"
-                value={newName}
-                maxLength={120}
-                onChange={(e) => {
-                  setNewName(e.target.value)
-                  setNewError('')
-                }}
-                data-autofocus
-                autoFocus
-              />
-              {newError && <p className="ui-field__error">{newError}</p>}
-            </div>
-            <button type="submit" className="ui-btn ui-btn--primary">
-              Usar
-            </button>
-            <button type="button" className="ui-btn ui-btn--ghost" onClick={() => setNewMode(false)}>
-              Cancelar
-            </button>
-          </form>
-        ) : (
-          <>
-            <div className="ui-field inv-toolbar__select">
-              <label htmlFor="inv-property">Imóvel</label>
-              <select
-                id="inv-property"
-                className="ui-input"
-                value={selected}
-                onChange={(e) => setSelected(e.target.value)}
-                disabled={!options.length}
-              >
-                {!options.length && <option value="">Nenhum imóvel ainda</option>}
-                {options.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name} · {p.itemsCount} {p.itemsCount === 1 ? 'item' : 'itens'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="button" className="ui-btn ui-btn--ghost" onClick={() => setNewMode(true)}>
-              <Plus aria-hidden />
-              Novo imóvel
-            </button>
-          </>
-        )}
+        <div className="ui-field inv-toolbar__select">
+          <label htmlFor="inv-property">Imóvel</label>
+          <select
+            id="inv-property"
+            className="ui-input"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            disabled={!options.length}
+          >
+            {!options.length && <option value="">Nenhum imóvel cadastrado</option>}
+            {options.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name} · {p.itemsCount} {p.itemsCount === 1 ? 'item' : 'itens'}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="button" className="ui-btn ui-btn--ghost" onClick={() => navigate('/ajustes/imoveis')}>
+          <Plus aria-hidden />
+          Gerenciar imóveis
+        </button>
       </div>
 
       {loadError && <p className="ui-field__error">{loadError}</p>}
@@ -187,7 +130,7 @@ export function PropertiesTab() {
             <span className="panel__state-icon">
               <Building2 strokeWidth={1.6} />
             </span>
-            <p>Nenhum imóvel encontrado. Cadastre uma reserva ou use “Novo imóvel” para começar o inventário.</p>
+            <p>Nenhum imóvel cadastrado ainda. Cadastre seus imóveis em Ajustes › Imóveis para montar o inventário de cada um.</p>
           </div>
         </section>
       ) : (

@@ -1,4 +1,4 @@
-import { CalendarPlus, Check, Minus, Plus, ReceiptText, Trash2, UserPlus } from 'lucide-react'
+import { CalendarPlus, Check, Clock, Minus, Plus, ReceiptText, Trash2, UserPlus } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DateRangePicker } from '../../components/ui/DateRangePicker'
 import { DependentNotice } from '../../components/ui/DependentNotice'
@@ -8,7 +8,9 @@ import { Modal } from '../../components/ui/Modal'
 import { Segmented } from '../../components/ui/Segmented'
 import {
   ApiError,
+  propertiesApi,
   reservationsApi,
+  type Property,
   type AgeGroup,
   type CommissionType,
   type ExtensionChannel,
@@ -22,6 +24,7 @@ import {
   type ReservationStatus,
 } from '../../services/api'
 import { describeDocument } from '../../utils/documents'
+import { collapseSpaces, maskCompanionDocument, stripSpaces } from '../../utils/text'
 import {
   addDaysIso,
   centsFromInput,
@@ -46,6 +49,18 @@ import { STATUS_OPTIONS } from './status'
 
 const MAX_GUESTS = 50
 const MAX_COSTS = 50
+const MAX_ADDITIONS = 50
+
+/** Sugestões para "Valores adicionais" (o tipo continua livre). */
+const ADDITION_SUGGESTIONS = [
+  'Hóspede adicional',
+  'Pet',
+  'Late check-out',
+  'Early check-in',
+  'Estacionamento',
+  'Consumo / frigobar',
+  'Taxa de limpeza cobrada do hóspede',
+]
 const MAX_EXTENSIONS = 20
 
 interface CompanionDraft {
@@ -78,6 +93,8 @@ interface FormValues {
   bookedAt: string
   checkIn: string
   checkOut: string
+  checkInTime: string // HH:MM ('' = não informado)
+  checkOutTime: string
   status: ReservationStatus
   platform: Platform | ''
   paymentMethod: PaymentMethod | ''
@@ -86,6 +103,7 @@ interface FormValues {
   commissionRateText: string
   commissionCents: number
   costs: CostDraft[]
+  additions: AdditionDraft[]
   extensions: ExtensionDraft[]
 }
 
@@ -95,13 +113,32 @@ let nextKey = 1
 const draft = (c?: Partial<CompanionDraft>): CompanionDraft => ({
   key: nextKey++,
   fullName: c?.fullName ?? '',
-  document: c?.document ?? '',
+  document: maskCompanionDocument(c?.document ?? ''),
   ageGroup: c?.ageGroup ?? 'ADULT',
 })
+/** Valor adicional: valor digitado (VALOR) ou horas, com o valor calculado pela hospedagem (HORAS). */
+interface AdditionDraft extends CostDraft {
+  kind: 'VALOR' | 'HORAS'
+  hoursText: string
+}
+const MAX_ADDITIONAL_HOURS = 72
+
+/** "2,5" → 2.5 (uma casa decimal, igual ao back-end); 0 quando vazio ou inválido. */
+const parseHours = (text: string) => {
+  const n = Number(text.replace(',', '.'))
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : 0
+}
+
 const costDraft = (c?: Partial<CostDraft>): CostDraft => ({
   key: nextKey++,
   description: c?.description ?? '',
   amountCents: c?.amountCents ?? 0,
+})
+
+const additionDraft = (a?: Partial<AdditionDraft>): AdditionDraft => ({
+  ...costDraft(a),
+  kind: a?.kind ?? 'VALOR',
+  hoursText: a?.hoursText ?? '',
 })
 
 /** Nova extensão: começa no último check-out e sugere +1 noite. */
@@ -139,6 +176,8 @@ function initialValues(r: Reservation | null, startExtending = false, prefill?: 
       bookedAt: todayIso(),
       checkIn: prefill?.checkIn ?? '',
       checkOut: prefill?.checkOut ?? '',
+      checkInTime: '',
+      checkOutTime: '',
       status: 'VAZIO',
       platform,
       paymentMethod: platform && PAID_VIA_PLATFORM.includes(platform) ? 'PLATAFORMA' : '',
@@ -147,6 +186,7 @@ function initialValues(r: Reservation | null, startExtending = false, prefill?: 
       commissionRateText: '',
       commissionCents: 0,
       costs: [],
+      additions: [],
       extensions: [],
     }
   }
@@ -159,6 +199,8 @@ function initialValues(r: Reservation | null, startExtending = false, prefill?: 
     bookedAt: r.bookedAt,
     checkIn: r.checkIn,
     checkOut: r.checkOut,
+    checkInTime: r.checkInTime ?? '',
+    checkOutTime: r.checkOutTime ?? '',
     status: r.status,
     platform: r.platform ?? '',
     paymentMethod: r.paymentMethod ?? '',
@@ -167,6 +209,14 @@ function initialValues(r: Reservation | null, startExtending = false, prefill?: 
     commissionRateText: r.commissionRate !== null ? formatPercent(r.commissionRate) : '',
     commissionCents: r.commissionCents,
     costs: (r.costs ?? []).map((c) => costDraft(c)),
+    additions: (r.additions ?? []).map((a) =>
+      additionDraft({
+        description: a.description,
+        amountCents: a.amountCents,
+        kind: a.kind,
+        hoursText: a.hours ? String(a.hours).replace('.', ',') : '',
+      }),
+    ),
     extensions: [],
   }
   base.extensions = (r.extensions ?? []).map((e) => ({
@@ -223,7 +273,7 @@ function validate(v: FormValues): Errors {
   const e: Errors = {}
   // na mesma ordem em que aparecem na tela (o foco vai para o primeiro erro)
   if (!v.reservationNumber.trim()) e.reservationNumber = 'Informe o número da reserva'
-  if (v.propertyName.trim().length < 2) e.propertyName = 'Informe o imóvel'
+  if (v.propertyName.trim().length < 2) e.propertyName = 'Selecione o imóvel'
   if (!v.platform) e.platform = 'Selecione a plataforma de origem'
   if (v.platform === 'DIRETO' && v.paymentMethod === 'PLATAFORMA')
     e.paymentMethod = 'Contrato direto não é pago via plataforma'
@@ -240,6 +290,16 @@ function validate(v: FormValues): Errors {
   if (v.commissionType === 'PERCENT' && !v.commissionRateText.trim()) e.commissionRate = 'Informe o percentual'
   if (v.commissionType === 'VALUE' && v.commissionCents > v.amountCents)
     e.commissionCents = 'A comissão não pode ser maior que o valor da reserva'
+  v.additions.forEach((a, i) => {
+    if (a.description.trim().length < 2) e[`additions.${i}.description`] = 'Informe o tipo'
+    if (a.kind === 'HORAS') {
+      const hours = parseHours(a.hoursText)
+      if (hours <= 0) e[`additions.${i}.hours`] = 'Informe as horas'
+      else if (hours > MAX_ADDITIONAL_HOURS) e[`additions.${i}.hours`] = `Máximo de ${MAX_ADDITIONAL_HOURS} horas`
+      else if (v.amountCents <= 0 || !v.checkIn || !v.checkOut)
+        e[`additions.${i}.hours`] = 'Informe o valor da reserva e as datas para calcular'
+    } else if (a.amountCents <= 0) e[`additions.${i}.amountCents`] = 'Informe o valor'
+  })
   v.costs.forEach((c, i) => {
     if (c.description.trim().length < 2) e[`costs.${i}.description`] = 'Informe o tipo'
     if (c.amountCents <= 0) e[`costs.${i}.amountCents`] = 'Informe o valor'
@@ -290,6 +350,9 @@ export function ReservationFormModal({
   // a comissão não tiver sido mexida à mão — depois disso o que o usuário digitou prevalece.
   const [fees, setFees] = useState<FeeMap>({})
   const commissionTouched = useRef(false)
+
+  // Imóveis cadastrados em Ajustes > Imóveis (null = ainda carregando)
+  const [properties, setProperties] = useState<Property[] | null>(null)
 
   // Anexos: novos (enviados após salvar) e removidos (apagados após salvar)
   const [pendingFiles, setPendingFiles] = useState<PendingAttachment[]>([])
@@ -364,6 +427,33 @@ export function ReservationFormModal({
     setDirty(true)
   }
 
+  // ---------- Valores adicionais (a receber) ----------
+  function addAddition(kind: AdditionDraft['kind'] = 'VALOR') {
+    if (values.additions.length >= MAX_ADDITIONS) return
+    const draft = additionDraft({ kind, description: kind === 'HORAS' ? 'Horas adicionais' : '' })
+    update({ additions: [...values.additions, draft] })
+    requestAnimationFrame(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('.addition__description')
+      inputs[inputs.length - 1]?.focus()
+    })
+  }
+
+  function updateAddition(index: number, patch: Partial<AdditionDraft>) {
+    setValues((v) => ({ ...v, additions: v.additions.map((a, i) => (i === index ? { ...a, ...patch } : a)) }))
+    setErrors((e) => {
+      const next = { ...e }
+      Object.keys(patch).forEach((k) => delete next[`additions.${index}.${k}`])
+      return next
+    })
+    setDirty(true)
+  }
+
+  function removeAddition(index: number) {
+    setValues((v) => ({ ...v, additions: v.additions.filter((_, i) => i !== index) }))
+    setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('additions.'))))
+    setDirty(true)
+  }
+
   // ---------- Custos e taxas ----------
   function addCost() {
     if (values.costs.length >= MAX_COSTS) return
@@ -420,6 +510,30 @@ export function ReservationFormModal({
     setDirty(true)
   }
 
+  // Carrega os imóveis cadastrados; recarrega ao voltar de outra aba (ex.: depois de cadastrar um imóvel)
+  useEffect(() => {
+    let cancelled = false
+    const load = () =>
+      propertiesApi
+        .list()
+        .then(({ data }) => {
+          if (cancelled) return
+          setProperties(data)
+          // Reserva nova e só um imóvel ativo: já vem escolhido
+          const active = data.filter((p) => p.isActive)
+          if (!isEdit && active.length === 1) {
+            setValues((v) => (v.propertyName.trim() ? v : { ...v, propertyName: active[0].name }))
+          }
+        })
+        .catch(() => !cancelled && setProperties((cur) => cur ?? []))
+    load()
+    window.addEventListener('focus', load)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', load)
+    }
+  }, [isEdit])
+
   // Carrega as taxas pré-cadastradas (falha silenciosa: sem elas o preenchimento é manual)
   useEffect(() => {
     if (isEdit) return
@@ -463,7 +577,14 @@ export function ReservationFormModal({
   const extensionsCents = extensions.reduce((sum, x) => sum + x.amountCents, 0)
   const extensionsCommission = extensions.reduce((sum, x) => sum + x.commissionCents, 0)
   const extraNights = extensions.reduce((sum, x) => sum + x.nights, 0)
-  const grossCents = values.amountCents + extensionsCents
+  // Valor da hora = (reserva + extensões) ÷ noites ÷ 24 — mesma conta do back-end; sem comissão
+  const stayNights = nightsBetween(values.checkIn, values.checkOut) + extraNights
+  const hourlyCents = stayNights > 0 ? (values.amountCents + extensionsCents) / stayNights / 24 : 0
+  const additionAmounts = values.additions.map((a) =>
+    a.kind === 'HORAS' ? Math.round(hourlyCents * parseHours(a.hoursText)) : a.amountCents,
+  )
+  const additionsCents = additionAmounts.reduce((sum, n) => sum + n, 0)
+  const grossCents = values.amountCents + extensionsCents + additionsCents
   const netCents = grossCents - commissionCents - extensionsCommission - costsCents
   const finalCheckOut = [...values.extensions].reverse().find((x) => x.checkOut)?.checkOut || values.checkOut
   const commissionPct = values.amountCents > 0 ? (commissionCents / values.amountCents) * 100 : 0
@@ -523,18 +644,20 @@ export function ReservationFormModal({
     }
 
     const payload: ReservationInput = {
-      reservationNumber: values.reservationNumber.trim(),
+      reservationNumber: stripSpaces(values.reservationNumber),
       mainGuestId: values.mainGuest?.id ?? null,
       propertyName: values.propertyName.trim(),
       guestsCount: values.guestsCount,
       companions: values.companions.map((c) => ({
         fullName: c.fullName.trim().replace(/\s+/g, ' '),
-        document: c.document.trim() || null,
+        document: maskCompanionDocument(c.document) || null,
         ageGroup: c.ageGroup,
       })),
       bookedAt: values.bookedAt,
       checkIn: values.checkIn,
       checkOut: values.checkOut,
+      checkInTime: values.checkInTime || null,
+      checkOutTime: values.checkOutTime || null,
       status: values.status,
       platform: values.platform as Platform, // validado acima
       paymentMethod: values.paymentMethod || null,
@@ -543,6 +666,12 @@ export function ReservationFormModal({
           ? { checkOut: x.checkOut, channel: x.channel, amountCents: x.amountCents, paymentMethod: x.paymentMethod || null }
           : { checkOut: x.checkOut, channel: x.channel },
       ),
+      additions: values.additions.map((a) => {
+        const description = a.description.trim().replace(/\s+/g, ' ')
+        return a.kind === 'HORAS'
+          ? { kind: 'HORAS' as const, description, hours: parseHours(a.hoursText) }
+          : { kind: 'VALOR' as const, description, amountCents: a.amountCents }
+      }),
       costs: values.costs.map((c) => ({
         description: c.description.trim().replace(/\s+/g, ' '),
         amountCents: c.amountCents,
@@ -684,7 +813,7 @@ export function ReservationFormModal({
                 placeholder="Ex.: 2026-000123"
                 maxLength={40}
                 value={values.reservationNumber}
-                onChange={(e) => update({ reservationNumber: e.target.value }, ['reservationNumber'])}
+                onChange={(e) => update({ reservationNumber: stripSpaces(e.target.value) }, ['reservationNumber'])}
                 disabled={saving}
                 {...aria('reservationNumber')}
               />
@@ -710,17 +839,39 @@ export function ReservationFormModal({
               <label htmlFor={idOf('propertyName')}>
                 Imóvel<span className="req">*</span>
               </label>
-              <input
-                className="ui-input"
-                autoComplete="off"
-                placeholder="Ex.: Apto 302 — Ed. Solar"
-                maxLength={120}
+              <select
+                className="ui-input ui-select"
                 value={values.propertyName}
                 onChange={(e) => update({ propertyName: e.target.value }, ['propertyName'])}
-                disabled={saving}
+                disabled={saving || properties === null}
                 {...aria('propertyName')}
-              />
-              {err('propertyName')}
+              >
+                <option value="">{properties === null ? 'Carregando…' : 'Selecione o imóvel'}</option>
+                {(properties ?? [])
+                  // desativados só aparecem se a reserva já é deles
+                  .filter((p) => p.isActive || p.name.trim().toLowerCase() === values.propertyName.trim().toLowerCase())
+                  .map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}
+                      {p.isActive ? '' : ' (desativado)'}
+                    </option>
+                  ))}
+                {/* nome que não está no cadastro (reserva antiga ou vinda do calendário) */}
+                {properties &&
+                  values.propertyName.trim() &&
+                  !properties.some((p) => p.name.trim().toLowerCase() === values.propertyName.trim().toLowerCase()) && (
+                    <option value={values.propertyName}>{values.propertyName} (não cadastrado)</option>
+                  )}
+              </select>
+              {err('propertyName') ??
+                (properties && !properties.some((p) => p.isActive) && (
+                  <p className="ui-field__hint">
+                    Nenhum imóvel cadastrado.{' '}
+                    <a href="/ajustes/imoveis" target="_blank" rel="noreferrer">
+                      Cadastrar imóvel
+                    </a>
+                  </p>
+                ))}
             </div>
 
             <div className="ui-field">
@@ -801,6 +952,34 @@ export function ReservationFormModal({
                     Com extensões: {totalNights} noites, saída em {formatDate(finalCheckOut)}
                   </p>
                 ))}
+            </div>
+            <div className={cls('checkInTime')}>
+              <label htmlFor={idOf('checkInTime')}>
+                Horário de entrada <span className="guest-form__optional">opcional</span>
+              </label>
+              <input
+                type="time"
+                className="ui-input"
+                value={values.checkInTime}
+                onChange={(e) => update({ checkInTime: e.target.value }, ['checkInTime'])}
+                disabled={saving}
+                {...aria('checkInTime')}
+              />
+              {err('checkInTime')}
+            </div>
+            <div className={cls('checkOutTime')}>
+              <label htmlFor={idOf('checkOutTime')}>
+                Horário de saída <span className="guest-form__optional">opcional</span>
+              </label>
+              <input
+                type="time"
+                className="ui-input"
+                value={values.checkOutTime}
+                onChange={(e) => update({ checkOutTime: e.target.value }, ['checkOutTime'])}
+                disabled={saving}
+                {...aria('checkOutTime')}
+              />
+              {err('checkOutTime')}
             </div>
           </div>
         </section>
@@ -1029,7 +1208,7 @@ export function ReservationFormModal({
                     placeholder="Nome completo"
                     maxLength={160}
                     value={c.fullName}
-                    onChange={(e) => updateCompanion(i, { fullName: e.target.value })}
+                    onChange={(e) => updateCompanion(i, { fullName: collapseSpaces(e.target.value) })}
                     disabled={saving}
                     {...aria(`companions.${i}.fullName`)}
                   />
@@ -1045,7 +1224,7 @@ export function ReservationFormModal({
                     placeholder={c.ageGroup === 'CHILD' ? 'Opcional' : 'CPF, RG ou passaporte'}
                     maxLength={30}
                     value={c.document}
-                    onChange={(e) => updateCompanion(i, { document: e.target.value })}
+                    onChange={(e) => updateCompanion(i, { document: maskCompanionDocument(e.target.value) })}
                     disabled={saving}
                     {...aria(`companions.${i}.document`)}
                   />
@@ -1199,6 +1378,136 @@ export function ReservationFormModal({
               )}
             </div>
 
+            {/* Valores adicionais a receber, somados ao valor bruto */}
+            <div className="ui-field ui-field--full">
+              <div className="guest-form__heading-row">
+                <span className="ui-field__label">Valores adicionais</span>
+                {values.additions.length > 0 && (
+                  <span className="guest-form__counter">
+                    {values.additions.length} {values.additions.length === 1 ? 'item' : 'itens'} ·{' '}
+                    {formatMoney(additionsCents)}
+                  </span>
+                )}
+              </div>
+              <p className="ui-field__hint cost__hint">
+                Dinheiro a <strong>receber</strong> além da reserva, como a diferença de um hóspede a mais, pet ou late
+                check-out. O valor soma ao total e não paga comissão da plataforma.
+              </p>
+              {values.additions.length > 0 && (
+                <ul className="costs">
+                  {values.additions.map((a, i) => {
+                    return (
+                      <li key={a.key} className="cost">
+                        <div className={cls(`additions.${i}.description`, 'cost__field')}>
+                          <input
+                            className="ui-input addition__description"
+                            list="res-addition-suggestions"
+                            autoComplete="off"
+                            placeholder={
+                              a.kind === 'HORAS' ? 'Motivo (ex.: Late check-out)' : 'Tipo (ex.: Hóspede adicional, Pet…)'
+                            }
+                            maxLength={120}
+                            value={a.description}
+                            onChange={(e) => updateAddition(i, { description: e.target.value })}
+                            disabled={saving}
+                            aria-label={`Tipo do valor adicional ${i + 1}`}
+                            {...aria(`additions.${i}.description`)}
+                          />
+                          {err(`additions.${i}.description`)}
+                        </div>
+                        {a.kind === 'HORAS' ? (
+                          <div className={cls(`additions.${i}.hours`, 'cost__field cost__amount')}>
+                            <div className="suffix-input">
+                              <input
+                                className="ui-input guest-form__mono"
+                                inputMode="decimal"
+                                placeholder="Horas"
+                                value={a.hoursText}
+                                onChange={(e) =>
+                                  updateAddition(i, { hoursText: e.target.value.replace(/[^\d.,]/g, '').slice(0, 5) })
+                                }
+                                onFocus={(e) => e.target.select()}
+                                disabled={saving}
+                                aria-label={`Horas adicionais ${i + 1}`}
+                                {...aria(`additions.${i}.hours`)}
+                              />
+                              <span aria-hidden>h</span>
+                            </div>
+                            {err(`additions.${i}.hours`)}
+                          </div>
+                        ) : (
+                          <div className={cls(`additions.${i}.amountCents`, 'cost__field cost__amount')}>
+                            <input
+                              className="ui-input guest-form__mono money-input"
+                              inputMode="numeric"
+                              value={formatMoney(a.amountCents)}
+                              onChange={(e) => updateAddition(i, { amountCents: centsFromInput(e.target.value) })}
+                              onFocus={(e) => e.target.select()}
+                              disabled={saving}
+                              aria-label={`Valor do valor adicional ${i + 1}`}
+                              {...aria(`additions.${i}.amountCents`)}
+                            />
+                            {err(`additions.${i}.amountCents`)}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="icon-btn companion__remove"
+                          onClick={() => removeAddition(i)}
+                          disabled={saving}
+                          aria-label={`Remover valor adicional ${i + 1}`}
+                          title="Remover"
+                        >
+                          <Trash2 strokeWidth={1.8} />
+                        </button>
+                        {a.kind === 'HORAS' && (
+                          <div className={`addition__calc ${hourlyCents > 0 ? '' : 'is-warning'}`} aria-live="polite">
+                            <span>
+                              {hourlyCents > 0
+                                ? `${formatMoney(Math.round(hourlyCents))} por hora (valor da hospedagem ÷ ${stayNights} ${
+                                    stayNights === 1 ? 'noite' : 'noites'
+                                  } ÷ 24 h) · sem comissão`
+                                : stayNights <= 0 && values.amountCents <= 0
+                                  ? 'Selecione as datas de check-in e check-out e informe o valor da reserva para calcular.'
+                                  : stayNights <= 0
+                                    ? 'Selecione as datas de check-in e check-out (em "Período") para calcular o valor da hora.'
+                                    : 'Informe o valor da reserva para calcular o valor da hora.'}
+                            </span>
+                            <strong className="guest-form__mono">{formatMoney(additionAmounts[i])}</strong>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              <datalist id="res-addition-suggestions">
+                {ADDITION_SUGGESTIONS.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+              <div className="addition__buttons">
+                <button
+                  type="button"
+                  className="companions__add"
+                  onClick={() => addAddition('VALOR')}
+                  disabled={saving || values.additions.length >= MAX_ADDITIONS}
+                >
+                  <Plus strokeWidth={1.8} />
+                  Adicionar valor a receber
+                </button>
+                <button
+                  type="button"
+                  className="companions__add"
+                  onClick={() => addAddition('HORAS')}
+                  disabled={saving || values.additions.length >= MAX_ADDITIONS}
+                >
+                  <Clock strokeWidth={1.8} />
+                  Adicionar horas adicionais
+                </button>
+              </div>
+            </div>
+
             {/* Custos e taxas descontados do valor bruto */}
             <div className="ui-field ui-field--full">
               <div className="guest-form__heading-row">
@@ -1305,11 +1614,30 @@ export function ReservationFormModal({
                       ))}
                     </ul>
                   </div>
-                  <div className="summary__row summary__row--subtotal">
-                    <span>Valor bruto</span>
-                    <span className="guest-form__mono">{formatMoney(grossCents)}</span>
-                  </div>
                 </>
+              )}
+              {values.additions.length > 0 && (
+                <div className="summary__row summary__row--plus summary__row--group">
+                  <span>Valores adicionais</span>
+                  <span className="guest-form__mono">+ {formatMoney(additionsCents)}</span>
+                  <ul className="summary__items">
+                    {values.additions.map((a, i) => (
+                      <li key={a.key}>
+                        <span>
+                          {a.description.trim() || `Valor adicional ${i + 1}`}
+                          {a.kind === 'HORAS' && parseHours(a.hoursText) > 0 && ` · ${parseHours(a.hoursText)} h`}
+                        </span>
+                        <span className="guest-form__mono">{formatMoney(additionAmounts[i])}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(extensions.length > 0 || values.additions.length > 0) && (
+                <div className="summary__row summary__row--subtotal">
+                  <span>Valor bruto</span>
+                  <span className="guest-form__mono">{formatMoney(grossCents)}</span>
+                </div>
               )}
               <div className="summary__row summary__row--minus">
                 <span>

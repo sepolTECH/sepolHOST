@@ -5,6 +5,7 @@ import { ApiError } from '../../services/api'
 import { EMAIL_RE, validatePassword } from '../../utils/password'
 import '../Login/Login.css'
 import { Logo } from '../../components/Logo'
+import { collapseSpaces, maskEmail } from '../../utils/text'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -82,7 +83,7 @@ export function Register() {
               autoComplete="name"
               placeholder="Seu nome completo"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setName(collapseSpaces(e.target.value))}
               disabled={busy}
               autoFocus
             />
@@ -98,7 +99,7 @@ export function Register() {
               autoComplete="email"
               placeholder="voce@sepol.com.br"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => setEmail(maskEmail(e.target.value))}
               disabled={busy}
             />
           </div>

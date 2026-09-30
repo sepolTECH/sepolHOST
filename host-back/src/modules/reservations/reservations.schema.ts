@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { docField, nameField } from '../../utils/fields.js';
 
 const MAX_CENTS = 100_000_000_00; // R$ 100 milhões
 
@@ -28,15 +29,53 @@ const date = (label: string) =>
     });
 
 const companionSchema = z.object({
-  fullName: z.string().trim().min(2, 'Informe o nome do hóspede').max(160, 'Nome muito longo'),
-  document: z
-    .string()
-    .trim()
-    .max(30, 'Identificação muito longa')
+  fullName: nameField.pipe(z.string().min(2, 'Informe o nome do hóspede').max(160, 'Nome muito longo')),
+  document: docField
+    .pipe(z.string().max(30, 'Identificação muito longa'))
     .nullish() // aceita ausente, null ou vazio
     .transform((v) => (v ? v : null)),
   ageGroup: z.enum(['ADULT', 'CHILD'], { message: 'Informe se é adulto ou criança' }),
 });
+
+/** Valor adicional a receber (hóspede extra, pet, late check-out…): soma ao valor bruto, sem comissão. */
+const MAX_ADDITIONAL_HOURS = 72;
+
+/**
+ * kind VALOR: valor digitado. kind HORAS: só as horas — o valor é calculado aqui, pela diária da
+ * hospedagem (reserva + extensões) ÷ noites ÷ 24, e o que o cliente enviar como valor é ignorado.
+ */
+const additionSchema = z
+  .object({
+    kind: z.enum(['VALOR', 'HORAS']).default('VALOR'),
+    description: z.string().trim().min(2, 'Informe o tipo do valor adicional').max(120, 'Descrição muito longa'),
+    amountCents: z.coerce
+      .number({ message: 'Informe o valor' })
+      .int('Valor inválido')
+      .min(1, 'Informe o valor')
+      .max(MAX_CENTS, 'Valor muito alto')
+      .optional(),
+    hours: z.coerce
+      .number({ message: 'Informe as horas' })
+      .positive('Informe as horas')
+      .max(MAX_ADDITIONAL_HOURS, `Máximo de ${MAX_ADDITIONAL_HOURS} horas`)
+      .transform((h) => Math.round(h * 10) / 10)
+      .optional(),
+  })
+  .superRefine((a, ctx) => {
+    if (a.kind === 'VALOR' && a.amountCents === undefined)
+      ctx.addIssue({ code: 'custom', path: ['amountCents'], message: 'Informe o valor' });
+    if (a.kind === 'HORAS' && (a.hours === undefined || a.hours <= 0))
+      ctx.addIssue({ code: 'custom', path: ['hours'], message: 'Informe as horas' });
+  });
+
+/** Horário HH:MM (opcional). */
+const timeOfDay = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido')
+  .nullish()
+  .or(z.literal(''))
+  .transform((v) => v || null);
 
 /** Custo/taxa descontado do valor bruto: o tipo é livre porque varia muito. */
 const costSchema = z.object({
@@ -68,7 +107,10 @@ const daysBetween = (from: string, to: string) =>
 
 export const reservationSchema = z
   .object({
-    reservationNumber: z.string().trim().min(1, 'Informe o número da reserva').max(40, 'Número muito longo'),
+    reservationNumber: z
+      .string()
+      .transform((v) => v.replace(/\s+/g, ''))
+      .pipe(z.string().min(1, 'Informe o número da reserva').max(40, 'Número muito longo')),
     // Hóspede responsável é opcional: a reserva pode existir sem uma pessoa vinculada
     mainGuestId: z
       .union([z.string().uuid('Hóspede responsável inválido'), z.literal(''), z.null()])
@@ -84,6 +126,8 @@ export const reservationSchema = z
     bookedAt: date('data da reserva'),
     checkIn: date('data do check-in'),
     checkOut: date('data do check-out'),
+    checkInTime: timeOfDay,
+    checkOutTime: timeOfDay,
     status: z.enum(['VAZIO', 'HOSPEDADO', 'CONCLUIDO'], { message: 'Status inválido' }),
     platform: z.enum(PLATFORMS, { message: 'Selecione a plataforma de origem' }),
     paymentMethod: z
@@ -91,6 +135,7 @@ export const reservationSchema = z
       .nullish()
       .transform((v) => v ?? null),
     costs: z.array(costSchema).max(50, 'Máximo de 50 custos por reserva').default([]),
+    additions: z.array(additionSchema).max(50, 'Máximo de 50 valores adicionais por reserva').default([]),
     extensions: z.array(extensionSchema).max(MAX_EXTENSIONS, `Máximo de ${MAX_EXTENSIONS} extensões`).default([]),
     amountCents: z.coerce
       .number({ message: 'Informe o valor da reserva' })
@@ -116,6 +161,18 @@ export const reservationSchema = z
     r.companions.forEach((c, i) => {
       if (c.ageGroup === 'ADULT' && !c.document)
         ctx.addIssue({ code: 'custom', path: ['companions', i, 'document'], message: 'Obrigatório para adulto' });
+    });
+
+    // Horas adicionais são calculadas pelo valor da hospedagem: precisa de valor e de noites
+    r.additions.forEach((a, i) => {
+      if (a.kind !== 'HORAS') return;
+      const lastCheckOut = r.extensions.length ? r.extensions[r.extensions.length - 1].checkOut : r.checkOut;
+      if (r.amountCents <= 0 || !r.checkIn || !lastCheckOut || daysBetween(r.checkIn, lastCheckOut) <= 0)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['additions', i, 'hours'],
+          message: 'Informe o valor da reserva e as datas para calcular as horas',
+        });
     });
 
     if (r.platform === 'DIRETO' && r.paymentMethod === 'PLATAFORMA')
@@ -181,6 +238,16 @@ export const reservationSchema = z
       return ext;
     });
     const extensionsCents = extensions.reduce((sum, e) => sum + e.amountCents, 0);
+
+    // Valores adicionais: por hora = (reserva + extensões) ÷ noites ÷ 24 × horas (sem comissão)
+    const stayNights = baseNights + extensions.reduce((sum, e) => sum + e.nights, 0);
+    const hourlyCents = stayNights > 0 ? (r.amountCents + extensionsCents) / stayNights / 24 : 0;
+    const additions = r.additions.map((a) =>
+      a.kind === 'HORAS'
+        ? { kind: 'HORAS' as const, description: a.description, hours: a.hours ?? 0, amountCents: Math.round(hourlyCents * (a.hours ?? 0)) }
+        : { kind: 'VALOR' as const, description: a.description, hours: null, amountCents: a.amountCents ?? 0 },
+    );
+    const additionsCents = additions.reduce((sum, a) => sum + a.amountCents, 0);
     const extensionsCommissionCents = extensions.reduce((sum, e) => sum + e.commissionCents, 0);
 
     return {
@@ -188,6 +255,8 @@ export const reservationSchema = z
       commissionRate,
       commissionCents,
       costsCents,
+      additions,
+      additionsCents,
       extensions,
       extensionsCents,
       extensionsCommissionCents,

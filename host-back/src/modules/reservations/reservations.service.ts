@@ -3,6 +3,7 @@ import { pool, query } from '../../db/pool.js';
 import { AppError } from '../../utils/AppError.js';
 import { absolutePath, detectFileType, removeFile, saveFile } from '../../utils/storage.js';
 import { syncFromReservation } from '../dependents/dependents.service.js';
+import { resolveName as resolvePropertyName } from '../properties/properties.service.js';
 import { loadOnReservationCreated, resyncOnPropertyChange } from '../inventory/inventory.service.js';
 import type { AttachmentCategory, ListQuery, ReservationInput } from './reservations.schema.js';
 
@@ -17,6 +18,8 @@ interface ReservationRow {
   booked_at: string;
   check_in: string;
   check_out: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
   status: Status;
   platform: ReservationInput['platform'] | null;
   payment_method: ReservationInput['paymentMethod'];
@@ -25,6 +28,7 @@ interface ReservationRow {
   commission_rate: number | null;
   commission_cents: number;
   costs_cents: number;
+  additions_cents: number;
   extensions_cents: number;
   extensions_commission_cents: number;
   final_check_out: string;
@@ -52,6 +56,11 @@ interface CostRow {
   id: string;
   description: string;
   amount_cents: number;
+}
+
+interface AdditionRow extends CostRow {
+  kind: 'VALOR' | 'HORAS';
+  hours: number | null;
 }
 
 interface ExtensionRow {
@@ -113,6 +122,9 @@ function toReservation(r: ReservationRow) {
     bookedAt: r.booked_at,
     checkIn: r.check_in,
     checkOut: r.check_out, // check-out original
+    // TIME vem como HH:MM:SS; a tela usa HH:MM
+    checkInTime: r.check_in_time?.slice(0, 5) ?? null,
+    checkOutTime: r.check_out_time?.slice(0, 5) ?? null,
     finalCheckOut: r.final_check_out, // considerando as extensões
     nights: nightsBetween(r.check_in, r.check_out),
     totalNights: nightsBetween(r.check_in, r.final_check_out),
@@ -124,14 +136,20 @@ function toReservation(r: ReservationRow) {
     commissionRate: r.commission_rate,
     commissionCents: r.commission_cents,
     costsCents: r.costs_cents,
+    additionsCents: r.additions_cents,
     extensionsCents: r.extensions_cents,
     extensionsCommissionCents: r.extensions_commission_cents,
     extensionsCount: r.extensions_count,
-    // Valor bruto = reserva + extensões
-    grossCents: r.amount_cents + r.extensions_cents,
+    // Valor bruto = reserva + extensões + valores adicionais
+    grossCents: r.amount_cents + r.extensions_cents + r.additions_cents,
     // Total geral = bruto − comissões (reserva + extensões pela plataforma) − custos e taxas
     netCents:
-      r.amount_cents + r.extensions_cents - r.commission_cents - r.extensions_commission_cents - r.costs_cents,
+      r.amount_cents +
+      r.extensions_cents +
+      r.additions_cents -
+      r.commission_cents -
+      r.extensions_commission_cents -
+      r.costs_cents,
     attachmentsCount: r.attachments_count,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -176,7 +194,7 @@ export async function list(ownerId: string, { search, status, page, pageSize }: 
 
   const { rows: countRows } = await query<{ total: number; amount: number; commission: number; costs: number }>(
     `SELECT COUNT(*)::int AS total,
-            COALESCE(SUM(r.amount_cents + r.extensions_cents), 0)::bigint AS amount,
+            COALESCE(SUM(r.amount_cents + r.extensions_cents + r.additions_cents), 0)::bigint AS amount,
             COALESCE(SUM(r.commission_cents + r.extensions_commission_cents), 0)::bigint AS commission,
             COALESCE(SUM(r.costs_cents), 0)::bigint AS costs
        FROM reservations r LEFT JOIN guests g ON g.id = r.main_guest_id ${whereSql}`,
@@ -274,13 +292,18 @@ export async function getById(ownerId: string, id: string, client?: PoolClient) 
   const run = client ? client.query.bind(client) : query;
   const { rows } = await run<ReservationRow>(`${SELECT} WHERE r.id = $1 AND r.owner_id = $2`, [id, ownerId]);
   if (!rows[0]) throw new AppError('Reserva não encontrada', 404);
-  const [{ rows: companions }, { rows: costs }, { rows: extensions }, { rows: attachments }] = await Promise.all([
+  const [{ rows: companions }, { rows: costs }, { rows: additions }, { rows: extensions }, { rows: attachments }] =
+    await Promise.all([
     run<CompanionRow>(
       'SELECT id, full_name, document, age_group FROM reservation_guests WHERE reservation_id = $1 ORDER BY position',
       [id],
     ),
     run<CostRow>(
       'SELECT id, description, amount_cents FROM reservation_costs WHERE reservation_id = $1 ORDER BY position',
+      [id],
+    ),
+    run<AdditionRow>(
+      'SELECT id, kind, description, hours, amount_cents FROM reservation_additions WHERE reservation_id = $1 ORDER BY position',
       [id],
     ),
     run<ExtensionRow>(
@@ -299,6 +322,13 @@ export async function getById(ownerId: string, id: string, client?: PoolClient) 
     ...toReservation(rows[0]),
     companions: companions.map((c) => ({ id: c.id, fullName: c.full_name, document: c.document, ageGroup: c.age_group })),
     costs: costs.map((c) => ({ id: c.id, description: c.description, amountCents: c.amount_cents })),
+    additions: additions.map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      description: a.description,
+      hours: a.hours,
+      amountCents: a.amount_cents,
+    })),
     extensions: extensions.map((e) => ({
       id: e.id,
       startDate: e.start_date,
@@ -331,6 +361,14 @@ async function saveChildren(client: PoolClient, reservationId: string, input: Re
       [reservationId, i, c.description, c.amountCents],
     );
   }
+  await client.query('DELETE FROM reservation_additions WHERE reservation_id = $1', [reservationId]);
+  for (const [i, a] of input.additions.entries()) {
+    await client.query(
+      `INSERT INTO reservation_additions (reservation_id, position, kind, description, hours, amount_cents)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [reservationId, i, a.kind, a.description, a.hours, a.amountCents],
+    );
+  }
   await client.query('DELETE FROM reservation_extensions WHERE reservation_id = $1', [reservationId]);
   for (const [i, e] of input.extensions.entries()) {
     await client.query(
@@ -351,6 +389,8 @@ const FIELDS: [column: string, value: (r: ReservationInput) => unknown][] = [
   ['booked_at', (r) => r.bookedAt],
   ['check_in', (r) => r.checkIn],
   ['check_out', (r) => r.checkOut],
+  ['check_in_time', (r) => r.checkInTime],
+  ['check_out_time', (r) => r.checkOutTime],
   ['status', (r) => r.status],
   ['platform', (r) => r.platform],
   ['payment_method', (r) => r.paymentMethod],
@@ -359,6 +399,7 @@ const FIELDS: [column: string, value: (r: ReservationInput) => unknown][] = [
   ['commission_rate', (r) => r.commissionRate],
   ['commission_cents', (r) => r.commissionCents],
   ['costs_cents', (r) => r.costsCents],
+  ['additions_cents', (r) => r.additionsCents],
   ['extensions_cents', (r) => r.extensionsCents],
   ['extensions_commission_cents', (r) => r.extensionsCommissionCents],
   ['final_check_out', (r) => r.finalCheckOut],
@@ -379,8 +420,10 @@ async function inTransaction<T>(fn: (client: PoolClient) => Promise<T>) {
   }
 }
 
-export function create(input: ReservationInput, userId: string) {
+export function create(rawInput: ReservationInput, userId: string) {
   return inTransaction(async (client) => {
+    // O imóvel precisa estar cadastrado (Ajustes > Imóveis); grava o nome como foi cadastrado
+    const input = { ...rawInput, propertyName: await resolvePropertyName(client, userId, rawInput.propertyName) };
     const values = FIELDS.map(([, v]) => v(input));
     const userParam = `$${values.length + 1}`;
     const { rows } = await client.query<{ id: string }>(
@@ -396,8 +439,9 @@ export function create(input: ReservationInput, userId: string) {
   });
 }
 
-export function update(id: string, input: ReservationInput, userId: string) {
+export function update(id: string, rawInput: ReservationInput, userId: string) {
   return inTransaction(async (client) => {
+    const input = { ...rawInput, propertyName: await resolvePropertyName(client, userId, rawInput.propertyName) };
     const values = FIELDS.map(([, v]) => v(input));
     const sets = FIELDS.map(([c], i) => `${c} = $${i + 2}`);
     const { rows: previous } = await client.query<{ property_name: string }>(

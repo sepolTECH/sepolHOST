@@ -23,3 +23,13 @@ export function maskEmail(value: string) {
   const at = clean.indexOf('@')
   return at < 0 ? clean : clean.slice(0, at + 1) + clean.slice(at + 1).replace(/@/g, '')
 }
+
+/** Tira qualquer espaço/quebra de linha (e-mail, número de reserva, documento…). */
+export const stripSpaces = (value: string) => value.replace(/\s+/g, '')
+
+/** Nome livre enquanto digita: sem espaços duplicados nem no começo (o do fim fica para dar para digitar o sobrenome). */
+export const collapseSpaces = (value: string) => value.replace(/\s+/g, ' ').trimStart()
+
+/** Identificação do acompanhante (RG, CPF, passaporte…): só letras e números, MAIÚSCULAS, sem pontos, traços ou espaços. */
+export const maskCompanionDocument = (value: string) =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 20)

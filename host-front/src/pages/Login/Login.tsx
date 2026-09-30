@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { ApiError } from '../../services/api'
 import './Login.css'
 import { Logo } from '../../components/Logo'
+import { maskEmail } from '../../utils/text'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -78,7 +79,7 @@ export function Login() {
               autoComplete="email"
               placeholder="voce@sepol.com.br"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => setEmail(maskEmail(e.target.value))}
               disabled={busy}
               autoFocus
             />

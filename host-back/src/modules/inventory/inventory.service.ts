@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { pool, query } from '../../db/pool.js';
 import { AppError } from '../../utils/AppError.js';
+import { resolveName as resolvePropertyName } from '../properties/properties.service.js';
 import type {
   PropertyItemInput,
   ReservationItemInput,
@@ -55,7 +56,7 @@ const toPropertyItem = (r: PropertyItemRow) => ({
   totalCents: r.quantity * r.value_cents,
 });
 
-/** Imóveis do cliente: os que aparecem nas reservas + os que já têm inventário. */
+/** Imóveis cadastrados pelo cliente (Ajustes > Imóveis) que estão ativos, com o resumo do inventário. */
 export async function listProperties(userId: string) {
   const { rows } = await query<{
     name: string;
@@ -63,28 +64,21 @@ export async function listProperties(userId: string) {
     total_cents: number;
     reservations_count: number;
   }>(
-    `SELECT k.name,
-            COALESCE(i.items_count, 0)::int        AS items_count,
-            COALESCE(i.total_cents, 0)::bigint     AS total_cents,
+    `SELECT p.name,
+            COALESCE(i.items_count, 0)::int         AS items_count,
+            COALESCE(i.total_cents, 0)::bigint      AS total_cents,
             COALESCE(rc.reservations_count, 0)::int AS reservations_count
-       FROM (
-         SELECT LOWER(BTRIM(p)) AS key, MIN(BTRIM(p)) AS name
-           FROM (
-             SELECT property_name AS p FROM inventory_items WHERE owner_id = $1
-             UNION ALL
-             SELECT property_name AS p FROM reservations WHERE owner_id = $1
-           ) x
-          GROUP BY 1
-       ) k
+       FROM properties p
        LEFT JOIN (
          SELECT LOWER(BTRIM(property_name)) AS key, COUNT(*) AS items_count, SUM(quantity * value_cents) AS total_cents
            FROM inventory_items WHERE owner_id = $1 GROUP BY 1
-       ) i ON i.key = k.key
+       ) i ON i.key = LOWER(BTRIM(p.name))
        LEFT JOIN (
          SELECT LOWER(BTRIM(property_name)) AS key, COUNT(*) AS reservations_count
            FROM reservations WHERE owner_id = $1 GROUP BY 1
-       ) rc ON rc.key = k.key
-      ORDER BY LOWER(k.name)`,
+       ) rc ON rc.key = LOWER(BTRIM(p.name))
+      WHERE p.owner_id = $1 AND p.is_active
+      ORDER BY LOWER(p.name)`,
     [userId],
   );
   return rows.map((r) => ({
@@ -108,13 +102,8 @@ export async function listItems(userId: string, property: string) {
 }
 
 export async function createItem(userId: string, input: PropertyItemInput) {
-  // Reaproveita a grafia do imóvel já cadastrado (evita "Casa Praia" e "casa praia" separados)
-  const { rows: existing } = await query<{ property_name: string }>(
-    `SELECT property_name FROM inventory_items
-      WHERE owner_id = $1 AND ${sameProperty('property_name', '$2')} LIMIT 1`,
-    [userId, input.propertyName],
-  );
-  const propertyName = existing[0]?.property_name ?? input.propertyName;
+  // O imóvel precisa estar cadastrado; usa a grafia do cadastro (evita "Casa Praia" e "casa praia" separados)
+  const propertyName = await resolvePropertyName({ query }, userId, input.propertyName);
 
   const { rows } = await query<PropertyItemRow>(
     `INSERT INTO inventory_items (owner_id, property_name, name, quantity, value_cents, created_by, updated_by)

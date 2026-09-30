@@ -35,6 +35,7 @@ interface StayRow {
   amount_cents: number;
   commission_cents: number;
   costs_cents: number;
+  additions_cents: number;
   extensions_cents: number;
   extensions_commission_cents: number;
 }
@@ -149,7 +150,8 @@ async function computeClosing(ownerId: string, year: number, month: number) {
       `SELECT r.id, r.reservation_number, r.property_name, r.main_guest_id, g.full_name AS main_guest_name,
               r.platform, r.status, r.check_in::text AS check_in, r.final_check_out::text AS final_check_out,
               r.amount_cents::float8 AS amount_cents, r.commission_cents::float8 AS commission_cents,
-              r.costs_cents::float8 AS costs_cents, r.extensions_cents::float8 AS extensions_cents,
+              r.costs_cents::float8 AS costs_cents, r.additions_cents::float8 AS additions_cents,
+              r.extensions_cents::float8 AS extensions_cents,
               r.extensions_commission_cents::float8 AS extensions_commission_cents
          FROM reservations r
          LEFT JOIN guests g ON g.id = r.main_guest_id
@@ -181,12 +183,14 @@ async function computeClosing(ownerId: string, year: number, month: number) {
   const stays = rows
     .filter((r) => inRange(r.final_check_out, refStart, refEnd))
     .map((r) => {
-      const grossCents = r.amount_cents + r.extensions_cents;
+      // valores adicionais (hóspede extra, pet…) entram no bruto, sem comissão
+      const grossCents = r.amount_cents + r.extensions_cents + r.additions_cents;
       const commissionCents = r.commission_cents + r.extensions_commission_cents;
       return {
         ...base(r),
         grossCents,
         extensionsCents: r.extensions_cents,
+        additionsCents: r.additions_cents,
         commissionCents,
         netCents: grossCents - commissionCents, // valor que cai na conta
       };
@@ -284,6 +288,7 @@ async function computeClosing(ownerId: string, year: number, month: number) {
       costReservations: costStays.length,
       grossCents,
       extensionsCents: sum(stays, (s) => s.extensionsCents),
+      additionsCents: sum(stays, (s) => s.additionsCents),
       commissionCents,
       costsCents,
       netCents,

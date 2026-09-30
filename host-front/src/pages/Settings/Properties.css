@@ -1,0 +1,90 @@
+/* ---------- Ajustes > Imóveis ---------- */
+.props__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.props__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.props__row:last-child {
+  border-bottom: 0;
+}
+.props__row.is-inactive {
+  opacity: 0.6;
+}
+.props__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border-radius: 10px;
+}
+.props__info {
+  flex: 1;
+  min-width: 0;
+}
+.props__info p {
+  margin: 0;
+}
+.props__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.props__badge {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border-radius: 999px;
+}
+.props__place {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+.props__meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.props__actions {
+  display: flex;
+  gap: 2px;
+}
+.props__notes {
+  height: auto;
+  padding: 10px 14px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.props__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.props__check input {
+  margin-top: 4px;
+  accent-color: var(--text-strong);
+}
+.props__check small {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-500);
+}

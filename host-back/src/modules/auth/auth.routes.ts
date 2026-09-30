@@ -5,12 +5,13 @@ import { env } from '../../config/env.js';
 import { AppError } from '../../utils/AppError.js';
 import { AUTH_COOKIE, ensureAnyAuth } from '../../middlewares/auth.js';
 import { durationToMs } from '../../utils/jwt.js';
+import { emailField, nameField } from '../../utils/fields.js';
 import * as authService from './auth.service.js';
 
 export const authRoutes = Router();
 
 const loginSchema = z.object({
-  email: z.string().trim().email('E-mail inválido'),
+  email: emailField,
   password: z.string().min(1, 'Informe a senha'),
   remember: z.boolean().optional().default(false),
 });
@@ -24,13 +25,13 @@ const passwordSchema = z
   .regex(/\d/, 'A senha deve conter pelo menos um número');
 
 const registerSchema = z.object({
-  name: z.string().trim().min(2, 'Informe seu nome').max(120, 'Nome muito longo'),
-  email: z.string().trim().email('E-mail inválido').max(255),
+  name: nameField.pipe(z.string().min(2, 'Informe seu nome').max(120, 'Nome muito longo')),
+  email: emailField.pipe(z.string().max(255)),
   password: passwordSchema,
 });
 
 const forgotSchema = z.object({
-  email: z.string().trim().email('E-mail inválido').max(255),
+  email: emailField.pipe(z.string().max(255)),
 });
 
 const resetSchema = z.object({

@@ -38,6 +38,9 @@ export const MENU: MenuItem[] = [
   {
     label: 'Ajustes',
     icon: Settings,
-    children: [{ label: 'Taxas', to: '/ajustes/taxas' }],
+    children: [
+      { label: 'Imóveis', to: '/ajustes/imoveis' },
+      { label: 'Taxas', to: '/ajustes/taxas' },
+    ],
   },
 ]

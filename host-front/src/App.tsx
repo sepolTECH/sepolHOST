@@ -22,6 +22,7 @@ import { Reservations } from './pages/Reservations/Reservations'
 import { ResetPassword } from './pages/ResetPassword/ResetPassword'
 import { Reviews } from './pages/Reviews/Reviews'
 import { Fees } from './pages/Settings/Fees'
+import { Properties } from './pages/Settings/Properties'
 
 function App() {
   return (
@@ -51,7 +52,8 @@ function App() {
                 <Route path="/inventario" element={<Inventory />} />
                 <Route path="/avaliacoes" element={<Reviews />} />
                 <Route path="/bloqueados" element={<Blocklist />} />
-                <Route path="/ajustes" element={<Navigate to="/ajustes/taxas" replace />} />
+                <Route path="/ajustes" element={<Navigate to="/ajustes/imoveis" replace />} />
+                <Route path="/ajustes/imoveis" element={<Properties />} />
                 <Route path="/ajustes/taxas" element={<Fees />} />
               </Route>
             </Route>

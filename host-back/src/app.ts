@@ -16,6 +16,7 @@ import { inventoryRoutes } from './modules/inventory/inventory.routes.js';
 import { associatesRoutes } from './modules/associates/associates.routes.js';
 import { associateAreaRoutes } from './modules/associate-area/associate-area.routes.js';
 import { settingsRoutes } from './modules/settings/settings.routes.js';
+import { propertiesRoutes } from './modules/properties/properties.routes.js';
 
 export const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/associates', associatesRoutes);
 app.use('/api/associate', associateAreaRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/properties', propertiesRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Rota não encontrada' });

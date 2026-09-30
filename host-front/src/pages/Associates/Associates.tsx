@@ -11,6 +11,7 @@ import {
 import '../Guests/Guests.css'
 import './Associates.css'
 import { ReleaseModal } from './ReleaseModal'
+import { collapseSpaces, maskEmail } from '../../utils/text'
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
@@ -295,7 +296,7 @@ function AssociateFormModal({
           <input
             className="ui-input"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(collapseSpaces(e.target.value))}
             placeholder="Ex.: Maria da Silva"
             autoComplete="off"
             autoFocus
@@ -309,7 +310,7 @@ function AssociateFormModal({
             type="email"
             inputMode="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(maskEmail(e.target.value))}
             placeholder="maria@email.com"
             autoComplete="off"
           />

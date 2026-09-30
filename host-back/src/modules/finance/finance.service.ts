@@ -34,6 +34,7 @@ interface Row {
   amount_cents: number;
   commission_cents: number;
   costs_cents: number;
+  additions_cents: number;
   extensions_cents: number;
   extensions_commission_cents: number;
 }
@@ -78,7 +79,7 @@ async function computeMonth(ownerId: string, year: number, month: number) {
             r.platform, r.status,
             -- datas como texto AAAA-MM-DD (independe do parser de DATE do driver)
             r.check_in::text AS check_in, r.check_out::text AS check_out, r.final_check_out::text AS final_check_out,
-            r.amount_cents::float8 AS amount_cents, r.commission_cents::float8 AS commission_cents, r.costs_cents::float8 AS costs_cents,
+            r.amount_cents::float8 AS amount_cents, r.commission_cents::float8 AS commission_cents, r.costs_cents::float8 AS costs_cents, r.additions_cents::float8 AS additions_cents,
             r.extensions_cents::float8 AS extensions_cents, r.extensions_commission_cents::float8 AS extensions_commission_cents
        FROM reservations r
        LEFT JOIN guests g ON g.id = r.main_guest_id
@@ -121,9 +122,12 @@ async function computeMonth(ownerId: string, year: number, month: number) {
       daysInMonth += extIn;
     }
     const costsCents = prorate(r.costs_cents, daysInMonth, totalDays);
+    // Valores adicionais a receber (hóspede extra, pet…): entram no bruto, divididos pelos dias como os custos
+    const additionsCents = prorate(r.additions_cents, daysInMonth, totalDays);
+    grossCents += additionsCents;
     // Noites dormidas no mês (para ocupação)
     const nightsInMonth = overlap(r.check_in, r.final_check_out, start, end);
-    const fullGrossCents = r.amount_cents + r.extensions_cents;
+    const fullGrossCents = r.amount_cents + r.extensions_cents + r.additions_cents;
 
     return {
       id: r.id,
@@ -142,6 +146,7 @@ async function computeMonth(ownerId: string, year: number, month: number) {
       partial: daysInMonth < totalDays,
       grossCents,
       extensionsCents,
+      additionsCents,
       commissionCents,
       costsCents,
       netCents: grossCents - commissionCents - costsCents,

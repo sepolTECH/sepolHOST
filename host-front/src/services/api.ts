@@ -338,6 +338,18 @@ export interface Companion {
   ageGroup: AgeGroup
 }
 
+/** Valor adicional a receber: valor digitado, ou horas (o valor é calculado pelo valor da hospedagem). */
+export interface ReservationAddition {
+  id?: string
+  kind: 'VALOR' | 'HORAS'
+  description: string
+  amountCents: number
+  hours: number | null
+}
+export type ReservationAdditionInput =
+  | { kind: 'VALOR'; description: string; amountCents: number }
+  | { kind: 'HORAS'; description: string; hours: number }
+
 export interface ReservationInput {
   reservationNumber: string
   mainGuestId: string | null // null = reserva sem hóspede vinculado
@@ -347,10 +359,14 @@ export interface ReservationInput {
   bookedAt: string // AAAA-MM-DD
   checkIn: string
   checkOut: string
+  checkInTime?: string | null // HH:MM
+  checkOutTime?: string | null // HH:MM
   status: ReservationStatus
   platform: Platform
   paymentMethod: PaymentMethod | null
   costs: ReservationCost[]
+  /** Valores a receber além da reserva (hóspede extra, pet…) */
+  additions?: ReservationAdditionInput[]
   extensions: ReservationExtensionInput[]
   amountCents: number
   commissionType: CommissionType
@@ -375,6 +391,8 @@ export interface Reservation {
   bookedAt: string
   checkIn: string
   checkOut: string // check-out original
+  checkInTime: string | null // HH:MM
+  checkOutTime: string | null // HH:MM
   finalCheckOut: string // com as extensões
   nights: number // noites da reserva original
   totalNights: number // com as extensões
@@ -386,10 +404,11 @@ export interface Reservation {
   commissionRate: number | null
   commissionCents: number
   costsCents: number
+  additionsCents: number
   extensionsCents: number
   extensionsCommissionCents: number
   extensionsCount: number
-  /** Valor bruto = reserva + extensões */
+  /** Valor bruto = reserva + extensões + valores adicionais */
   grossCents: number
   /** Total geral = bruto − comissões − custos */
   netCents: number
@@ -401,6 +420,7 @@ export interface Reservation {
   // só no detalhe
   companions?: Companion[]
   costs?: ReservationCost[]
+  additions?: ReservationAddition[]
   extensions?: ReservationExtension[]
   attachments?: ReservationAttachment[]
 }
@@ -640,6 +660,7 @@ export interface FinanceStay {
   partial: boolean // atravessa a virada do mês
   grossCents: number
   extensionsCents: number
+  additionsCents: number
   commissionCents: number
   costsCents: number
   netCents: number
@@ -1226,4 +1247,39 @@ export const settingsApi = {
   fees: (signal?: AbortSignal) => api<{ data: PlatformFee[] }>('/settings/fees', { signal }),
   saveFees: (fees: PlatformFee[]) =>
     api<{ data: PlatformFee[] }>('/settings/fees', { method: 'PUT', body: JSON.stringify({ fees }) }),
+}
+
+// ---------------------------------------------------------------------------
+// Imóveis (Ajustes > Imóveis)
+// ---------------------------------------------------------------------------
+
+export interface Property {
+  id: string
+  name: string
+  address: string | null
+  city: string | null
+  state: string | null
+  notes: string | null
+  isActive: boolean
+  reservationsCount: number
+  itemsCount: number
+}
+
+/** Campos do formulário (texto vazio = não informado). */
+export interface PropertyInput {
+  name: string
+  address: string
+  city: string
+  state: string
+  notes: string
+  isActive: boolean
+}
+
+export const propertiesApi = {
+  list: (signal?: AbortSignal) => api<{ data: Property[] }>('/properties', { signal }),
+  create: (input: PropertyInput) =>
+    api<{ property: Property }>('/properties', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: PropertyInput) =>
+    api<{ property: Property }>(`/properties/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  remove: (id: string) => api<void>(`/properties/${id}`, { method: 'DELETE' }),
 }

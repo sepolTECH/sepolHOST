@@ -1,13 +1,14 @@
 import { z } from 'zod';
+import { emailField, nameField } from '../../utils/fields.js';
 
 export const createAssociateSchema = z.object({
-  name: z.string().trim().min(2, 'Informe o nome').max(120, 'Nome muito longo'),
-  email: z.string().trim().email('E-mail inválido').max(255),
+  name: nameField.pipe(z.string().min(2, 'Informe o nome').max(120, 'Nome muito longo')),
+  email: emailField.pipe(z.string().max(255)),
 });
 
 export const updateAssociateSchema = z
   .object({
-    name: z.string().trim().min(2, 'Informe o nome').max(120, 'Nome muito longo').optional(),
+    name: nameField.pipe(z.string().min(2, 'Informe o nome').max(120, 'Nome muito longo')).optional(),
     isActive: z.boolean().optional(),
   })
   .refine((v) => v.name !== undefined || v.isActive !== undefined, { message: 'Nada para atualizar' });

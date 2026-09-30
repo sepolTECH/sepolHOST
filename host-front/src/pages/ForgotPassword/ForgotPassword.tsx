@@ -4,6 +4,7 @@ import { ApiError, authApi } from '../../services/api'
 import { EMAIL_RE } from '../../utils/password'
 import '../Login/Login.css'
 import { Logo } from '../../components/Logo'
+import { maskEmail } from '../../utils/text'
 
 type Status = 'idle' | 'loading' | 'sent' | 'error'
 
@@ -85,7 +86,7 @@ export function ForgotPassword() {
                   autoComplete="email"
                   placeholder="voce@sepol.com.br"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(maskEmail(e.target.value))}
                   disabled={busy}
                   autoFocus
                 />
