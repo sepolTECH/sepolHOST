@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Trash2, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Segmented } from '../../components/ui/Segmented'
 import { BlockedBadge } from '../../components/ui/BlockedBadge'
 import { StarDisplay } from '../../components/ui/StarRating'
@@ -78,7 +79,7 @@ export function Guests() {
     setFormOpen(true)
   }
 
-  function handleSaved(saved: Guest, isNew: boolean, warning?: string) {
+  function handleSaved(saved: Guest, isNew: boolean, warning?: string, options?: { thenReserve?: boolean }) {
     setFormOpen(false)
     showToast(warning ?? (isNew ? 'Hóspede cadastrado com sucesso' : 'Alterações salvas'))
     if (isNew) {
@@ -91,7 +92,27 @@ export function Guests() {
     } else {
       setResult((r) => r && { ...r, data: r.data.map((g) => (g.id === saved.id ? saved : g)) })
     }
+    // "Cadastrar e criar reserva": abre a reserva nova já com este hóspede
+    if (options?.thenReserve) navigate(`/cadastro/reservas?reservarPara=${saved.id}`)
   }
+
+  // Vinda da reserva: /cadastro/hospedes?novo=1 abre o cadastro de um hóspede novo
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const wantsNew = searchParams.get('novo') === '1'
+  const [handledNew, setHandledNew] = useState(false)
+  // Ajuste de estado durante o render, em vez de setState dentro de useEffect
+  if (wantsNew && !handledNew) {
+    setHandledNew(true)
+    setEditing(null)
+    setFormKey((k) => k + 1)
+    setFormOpen(true)
+  } else if (!wantsNew && handledNew) {
+    setHandledNew(false)
+  }
+  useEffect(() => {
+    if (wantsNew) setSearchParams({}, { replace: true })
+  }, [wantsNew, setSearchParams])
 
   async function handleDelete(g: Guest) {
     const n = g.reservationsCount ?? 0

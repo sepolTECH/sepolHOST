@@ -1211,3 +1211,19 @@ export const associateAreaApi = {
   saveReview: (id: string, input: AssociateReviewInput) =>
     api<AssociateReviewData>(`/associate/reservations/${id}/review`, { method: 'PUT', body: json(input) }),
 }
+
+// ---------------------------------------------------------------------------
+// Ajustes
+// ---------------------------------------------------------------------------
+
+export interface PlatformFee {
+  platform: Platform
+  /** Percentual (0–100) ou null quando não há taxa pré-cadastrada. */
+  commissionRate: number | null
+}
+
+export const settingsApi = {
+  fees: (signal?: AbortSignal) => api<{ data: PlatformFee[] }>('/settings/fees', { signal }),
+  saveFees: (fees: PlatformFee[]) =>
+    api<{ data: PlatformFee[] }>('/settings/fees', { method: 'PUT', body: JSON.stringify({ fees }) }),
+}

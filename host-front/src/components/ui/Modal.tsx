@@ -12,6 +12,9 @@ interface ModalProps {
   footer?: ReactNode
 }
 
+/** Modais abertos, do mais antigo ao mais novo: só o de cima reage ao Esc e ao Tab. */
+const openStack: symbol[] = []
+
 /**
  * Modal acessível: fecha com Esc e clique fora, trava o scroll da página e
  * devolve o foco ao elemento que o abriu. Em telas pequenas ocupa a tela toda.
@@ -27,11 +30,14 @@ export function Modal({ open, onClose, title, subtitle, size = 'lg', children, f
 
   useEffect(() => {
     if (!open) return
+    const token = Symbol('modal')
+    openStack.push(token)
     const previouslyFocused = document.activeElement as HTMLElement | null
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
 
     const onKey = (e: KeyboardEvent) => {
+      if (openStack[openStack.length - 1] !== token) return
       if (e.key === 'Escape') onCloseRef.current()
       // Mantém o Tab dentro do modal
       if (e.key === 'Tab' && dialogRef.current) {
@@ -63,6 +69,8 @@ export function Modal({ open, onClose, title, subtitle, size = 'lg', children, f
 
     return () => {
       document.removeEventListener('keydown', onKey)
+      const i = openStack.indexOf(token)
+      if (i >= 0) openStack.splice(i, 1)
       document.body.style.overflow = overflow
       previouslyFocused?.focus?.()
     }

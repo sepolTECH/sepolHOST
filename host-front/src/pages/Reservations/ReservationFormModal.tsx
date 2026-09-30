@@ -1,7 +1,9 @@
 import { CalendarPlus, Check, Minus, Plus, ReceiptText, Trash2, UserPlus } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { DateRangePicker } from '../../components/ui/DateRangePicker'
 import { DependentNotice } from '../../components/ui/DependentNotice'
 import { GuestPicker } from '../../components/ui/GuestPicker'
+import { GuestFormModal } from '../Guests/GuestFormModal'
 import { Modal } from '../../components/ui/Modal'
 import { Segmented } from '../../components/ui/Segmented'
 import {
@@ -10,9 +12,11 @@ import {
   type AgeGroup,
   type CommissionType,
   type ExtensionChannel,
+  type Guest,
   type MainGuest,
   type PaymentMethod,
   type Platform,
+  settingsApi,
   type Reservation,
   type ReservationInput,
   type ReservationStatus,
@@ -35,6 +39,7 @@ import {
   EXTENSION_CHANNEL_LABEL,
   PAID_VIA_PLATFORM,
   PAYMENT_LABEL,
+  PLATFORM_LABEL,
   PLATFORM_OPTIONS,
 } from './options'
 import { STATUS_OPTIONS } from './status'
@@ -118,6 +123,8 @@ export interface ReservationPrefill {
   checkIn?: string
   checkOut?: string
   platform?: Platform
+  /** Hóspede responsável já vinculado (ex.: vindo do cadastro de hóspedes). */
+  mainGuest?: MainGuest
 }
 
 function initialValues(r: Reservation | null, startExtending = false, prefill?: ReservationPrefill): FormValues {
@@ -125,7 +132,7 @@ function initialValues(r: Reservation | null, startExtending = false, prefill?: 
     const platform = prefill?.platform ?? ''
     return {
       reservationNumber: prefill?.reservationNumber ?? '',
-      mainGuest: null,
+      mainGuest: prefill?.mainGuest ?? null,
       propertyName: prefill?.propertyName ?? '',
       guestsCount: 1,
       companions: [],
@@ -179,6 +186,16 @@ function initialValues(r: Reservation | null, startExtending = false, prefill?: 
  * PLATAFORMA = noites × diária média da reserva, com a mesma comissão;
  * DIRETO = valor informado, sem comissão.
  */
+/** Taxa pré-cadastrada (Ajustes > Taxas) por plataforma, em %. */
+type FeeMap = Partial<Record<Platform, number>>
+
+/** Preenche a comissão (em %) com a taxa padrão da plataforma, quando ela existe. */
+function withDefaultFee(v: FormValues, fees: FeeMap): FormValues {
+  const rate = v.platform ? fees[v.platform] : undefined
+  if (rate === undefined) return v
+  return { ...v, commissionType: 'PERCENT', commissionRateText: formatPercent(rate) }
+}
+
 function computeExtensions(v: FormValues, commissionCents: number) {
   const baseNights = nightsBetween(v.checkIn, v.checkOut)
   const dailyCents = baseNights > 0 ? v.amountCents / baseNights : 0
@@ -269,9 +286,18 @@ export function ReservationFormModal({
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
+  // Taxa padrão por plataforma (Ajustes > Taxas). Só sugere em reserva nova, e só enquanto
+  // a comissão não tiver sido mexida à mão — depois disso o que o usuário digitou prevalece.
+  const [fees, setFees] = useState<FeeMap>({})
+  const commissionTouched = useRef(false)
+
   // Anexos: novos (enviados após salvar) e removidos (apagados após salvar)
   const [pendingFiles, setPendingFiles] = useState<PendingAttachment[]>([])
   const [removedAttachments, setRemovedAttachments] = useState<string[]>([])
+
+  function touchCommission() {
+    commissionTouched.current = true
+  }
 
   function update(patch: Partial<FormValues>, clear: string[] = []) {
     setValues((v) => ({ ...v, ...patch }))
@@ -331,7 +357,8 @@ export function ReservationFormModal({
       // Airbnb/Booking/VRBO costumam receber do hóspede; contrato direto nunca é "via plataforma"
       if (!paymentMethod && PAID_VIA_PLATFORM.includes(platform)) paymentMethod = 'PLATAFORMA'
       if (platform === 'DIRETO' && paymentMethod === 'PLATAFORMA') paymentMethod = ''
-      return { ...v, platform, paymentMethod }
+      const next = { ...v, platform, paymentMethod }
+      return isEdit || commissionTouched.current ? next : withDefaultFee(next, fees)
     })
     setErrors((e) => ({ ...e, platform: undefined, paymentMethod: undefined }))
     setDirty(true)
@@ -393,6 +420,26 @@ export function ReservationFormModal({
     setDirty(true)
   }
 
+  // Carrega as taxas pré-cadastradas (falha silenciosa: sem elas o preenchimento é manual)
+  useEffect(() => {
+    if (isEdit) return
+    let cancelled = false
+    settingsApi
+      .fees()
+      .then(({ data }) => {
+        if (cancelled) return
+        const map: FeeMap = {}
+        for (const f of data) if (f.commissionRate !== null) map[f.platform] = f.commissionRate
+        setFees(map)
+        // plataforma já escolhida na abertura (ex.: vinda do calendário)
+        if (!commissionTouched.current) setValues((v) => withDefaultFee(v, map))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit])
+
   // Atalho da lista: rola até a seção e foca a data da extensão nova
   useEffect(() => {
     if (!startExtending) return
@@ -406,6 +453,11 @@ export function ReservationFormModal({
 
   // ---------- Valores ----------
   const commissionCents = commissionOf(values)
+  const defaultFee = !isEdit && values.platform ? fees[values.platform] : undefined
+  const defaultApplied =
+    defaultFee !== undefined &&
+    values.commissionType === 'PERCENT' &&
+    parsePercent(values.commissionRateText).value === defaultFee
   const costsCents = values.costs.reduce((sum, c) => sum + c.amountCents, 0)
   const extensions = computeExtensions(values, commissionCents)
   const extensionsCents = extensions.reduce((sum, x) => sum + x.amountCents, 0)
@@ -419,6 +471,7 @@ export function ReservationFormModal({
   const totalNights = nights + extraNights
 
   function changeCommissionType(type: CommissionType) {
+    touchCommission()
     // converte o valor atual para o outro formato, para não perder o que foi digitado
     if (type === values.commissionType) return
     if (type === 'VALUE') update({ commissionType: type, commissionCents }, ['commissionRate', 'commissionCents'])
@@ -433,6 +486,22 @@ export function ReservationFormModal({
   }
 
   // ---------- Salvar ----------
+  // Cadastro de hóspede aberto por cima da reserva: os dados da reserva continuam aqui, intactos
+  const [guestFormOpen, setGuestFormOpen] = useState(false)
+  const [guestFormKey, setGuestFormKey] = useState(0)
+  function openGuestForm() {
+    if (saving) return
+    setGuestFormKey((k) => k + 1)
+    setGuestFormOpen(true)
+  }
+  function linkGuest(g: Guest) {
+    setGuestFormOpen(false)
+    update(
+      { mainGuest: { id: g.id, fullName: g.fullName, documentType: g.documentType, documentNumber: g.documentNumber } },
+      ['mainGuestId'],
+    )
+  }
+
   function requestClose() {
     if (saving) return
     const changed = dirty || extendedOnOpen || pendingFiles.length > 0 || removedAttachments.length > 0
@@ -553,6 +622,7 @@ export function ReservationFormModal({
   })
 
   return (
+    <>
     <Modal
       open={open}
       onClose={requestClose}
@@ -562,6 +632,10 @@ export function ReservationFormModal({
         <>
           <button type="button" className="ui-btn ui-btn--ghost" onClick={requestClose} disabled={saving}>
             Cancelar
+          </button>
+          <button type="button" className="ui-btn ui-btn--ghost" onClick={openGuestForm} disabled={saving}>
+            <UserPlus strokeWidth={1.8} />
+            Cadastrar hóspede
           </button>
           <button type="submit" form="reservation-form" className="ui-btn ui-btn--primary" disabled={saving}>
             {saving ? <span className="spinner" /> : <Check strokeWidth={2.2} />}
@@ -703,39 +777,28 @@ export function ReservationFormModal({
         <section className="guest-form__section">
           <h3 className="guest-form__heading">Período</h3>
           <div className="guest-form__grid">
-            <div className={cls('checkIn')}>
+            <div className={cls('checkIn', 'ui-field--full')}>
               <label htmlFor={idOf('checkIn')}>
-                Check-in<span className="req">*</span>
+                Check-in e check-out<span className="req">*</span>
               </label>
-              <input
-                type="date"
-                className="ui-input"
-                value={values.checkIn}
-                onChange={(e) => update({ checkIn: e.target.value }, ['checkIn', 'checkOut'])}
+              <DateRangePicker
+                id={idOf('checkIn')}
+                checkIn={values.checkIn}
+                checkOut={values.checkOut}
+                onChange={(checkIn, checkOut) => update({ checkIn, checkOut }, ['checkIn', 'checkOut'])}
                 disabled={saving}
-                {...aria('checkIn')}
+                invalid={!!errors.checkIn || !!errors.checkOut}
+                describedBy={
+                  [errors.checkIn && `${idOf('checkIn')}-error`, errors.checkOut && `${idOf('checkOut')}-error`]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
               />
               {err('checkIn')}
-            </div>
-            <div className={cls('checkOut')}>
-              <label htmlFor={idOf('checkOut')}>
-                Check-out<span className="req">*</span>
-              </label>
-              <input
-                type="date"
-                className="ui-input"
-                min={values.checkIn || undefined}
-                value={values.checkOut}
-                onChange={(e) => update({ checkOut: e.target.value }, ['checkOut'])}
-                disabled={saving}
-                {...aria('checkOut')}
-              />
               {err('checkOut') ??
-                (nights > 0 && (
+                (nights > 0 && extraNights > 0 && (
                   <p className="ui-field__hint">
-                    {nights} {nights === 1 ? 'noite' : 'noites'}
-                    {extraNights > 0 &&
-                      ` · com extensões: ${totalNights} noites, saída em ${formatDate(finalCheckOut)}`}
+                    Com extensões: {totalNights} noites, saída em {formatDate(finalCheckOut)}
                   </p>
                 ))}
             </div>
@@ -1083,9 +1146,10 @@ export function ReservationFormModal({
                       inputMode="decimal"
                       placeholder="0"
                       value={values.commissionRateText}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        touchCommission()
                         update({ commissionRateText: parsePercent(e.target.value).text }, ['commissionRate'])
-                      }
+                      }}
                       disabled={saving}
                       {...aria('commissionRate')}
                     />
@@ -1096,7 +1160,10 @@ export function ReservationFormModal({
                     className="ui-input guest-form__mono money-input"
                     inputMode="numeric"
                     value={formatMoney(values.commissionCents)}
-                    onChange={(e) => update({ commissionCents: centsFromInput(e.target.value) }, ['commissionCents'])}
+                    onChange={(e) => {
+                      touchCommission()
+                      update({ commissionCents: centsFromInput(e.target.value) }, ['commissionCents'])
+                    }}
                     onFocus={(e) => e.target.select()}
                     disabled={saving}
                     {...aria('commissionCents')}
@@ -1104,6 +1171,32 @@ export function ReservationFormModal({
                 )}
               </div>
               {err(values.commissionType === 'PERCENT' ? 'commissionRate' : 'commissionCents')}
+              {defaultFee !== undefined && (
+                <p className="ui-field__hint">
+                  {defaultApplied
+                    ? `Taxa pré-cadastrada de ${PLATFORM_LABEL[values.platform as Platform]}: ${formatPercent(defaultFee)}%. Você pode alterar.`
+                    : `Taxa pré-cadastrada de ${PLATFORM_LABEL[values.platform as Platform]}: ${formatPercent(defaultFee)}%.`}
+                  {!defaultApplied && (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => {
+                          touchCommission()
+                          update(
+                            { commissionType: 'PERCENT', commissionRateText: formatPercent(defaultFee) },
+                            ['commissionRate', 'commissionCents'],
+                          )
+                        }}
+                        disabled={saving}
+                      >
+                        Usar esta taxa
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
 
             {/* Custos e taxas descontados do valor bruto */}
@@ -1291,5 +1384,15 @@ export function ReservationFormModal({
         </section>
       </form>
     </Modal>
+    <GuestFormModal
+      key={guestFormKey}
+      open={open && guestFormOpen}
+      guest={null}
+      hideReserveAction
+      onClose={() => setGuestFormOpen(false)}
+      onSaved={(g) => linkGuest(g)}
+      onEditExisting={linkGuest}
+    />
+    </>
   )
 }

@@ -399,3 +399,20 @@
     transition: none;
   }
 }
+
+/* botão com aparência de link (ações curtas dentro de textos de ajuda) */
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-strong);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

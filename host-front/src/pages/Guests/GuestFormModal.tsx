@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, CircleCheck, Lock, Pencil, RotateCcw, Users } from 'lucide-react'
+import { AlertTriangle, CalendarPlus, Check, CircleCheck, Lock, Pencil, RotateCcw, Users } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DependentNotice } from '../../components/ui/DependentNotice'
 import { Modal } from '../../components/ui/Modal'
@@ -148,12 +148,14 @@ interface GuestFormModalProps {
   guest: Guest | null // null = novo cadastro
   onClose: () => void
   /** warning: dados salvos, mas algo secundário falhou (ex.: envio da foto). */
-  onSaved: (guest: Guest, isNew: boolean, warning?: string) => void
+  onSaved: (guest: Guest, isNew: boolean, warning?: string, options?: { thenReserve?: boolean }) => void
   /** Abre a edição de um hóspede que já existe (quando o documento já está cadastrado). */
   onEditExisting?: (guest: Guest) => void
+  /** Esconde o atalho "criar reserva" (quando o cadastro é aberto de dentro de uma reserva). */
+  hideReserveAction?: boolean
 }
 
-export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }: GuestFormModalProps) {
+export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting, hideReserveAction }: GuestFormModalProps) {
   const isEdit = !!guest
   // O pai troca a "key" a cada abertura, então o estado sempre começa limpo
   const [values, setValues] = useState<GuestInput>(() => (guest ? fromGuest(guest) : EMPTY))
@@ -402,8 +404,13 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
     onClose()
   }
 
+  // "Salvar e criar reserva" usa o mesmo envio, só muda o que acontece depois de salvar
+  const thenReserveRef = useRef(false)
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const thenReserve = thenReserveRef.current
+    thenReserveRef.current = false
     if (saving || locked) return
 
     const found = validate(values)
@@ -467,7 +474,7 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
         err instanceof Error ? err.message : 'erro inesperado'
       }`
     }
-    onSaved(saved, !isEdit, warning || undefined)
+    onSaved(saved, !isEdit, warning || undefined, thenReserve ? { thenReserve: true } : undefined)
   }
 
   const docPlaceholder = {
@@ -626,6 +633,21 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
           <button type="button" className="ui-btn ui-btn--ghost" onClick={requestClose} disabled={saving}>
             Cancelar
           </button>
+          {!hideReserveAction && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--ghost"
+              disabled={saving || locked}
+              onClick={() => {
+                thenReserveRef.current = true
+                const form = document.getElementById('guest-form') as HTMLFormElement | null
+                form?.requestSubmit()
+              }}
+            >
+              <CalendarPlus strokeWidth={1.8} />
+              {isEdit ? 'Salvar e criar reserva' : 'Cadastrar e criar reserva'}
+            </button>
+          )}
           <button type="submit" form="guest-form" className="ui-btn ui-btn--primary" disabled={saving || locked}>
             {saving ? <span className="spinner" /> : <Check strokeWidth={2.2} />}
             {isEdit ? 'Salvar alterações' : 'Cadastrar hóspede'}
@@ -730,7 +752,7 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
                 {onEditExisting && (
                   <button type="button" className="ui-btn ui-btn--ghost" onClick={() => onEditExisting(existing)}>
                     <Pencil strokeWidth={1.8} />
-                    Abrir cadastro existente
+                    {hideReserveAction ? 'Usar este hóspede na reserva' : 'Abrir cadastro existente'}
                   </button>
                 )}
               </div>
@@ -851,13 +873,19 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting }
                             type="button"
                             className="ui-btn ui-btn--ghost"
                             onClick={() => {
-                              if (window.confirm('Abrir o cadastro existente? O que você digitou aqui será descartado.')) {
+                              if (
+                                window.confirm(
+                                  hideReserveAction
+                                    ? 'Usar este hóspede na reserva? O que você digitou aqui será descartado.'
+                                    : 'Abrir o cadastro existente? O que você digitou aqui será descartado.',
+                                )
+                              ) {
                                 onEditExisting(g)
                               }
                             }}
                           >
                             <Pencil strokeWidth={1.8} />
-                            Abrir cadastro
+                            {hideReserveAction ? 'Usar na reserva' : 'Abrir cadastro'}
                           </button>
                         )}
                       </li>

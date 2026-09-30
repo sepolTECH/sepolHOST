@@ -5,6 +5,7 @@ import { Segmented } from '../../components/ui/Segmented'
 import {
   ApiError,
   calendarApi,
+  guestsApi,
   reservationsApi,
   type Platform,
   type Reservation,
@@ -140,6 +141,36 @@ export function Reservations() {
   useEffect(() => {
     if (newFromCalendar) setSearchParams({}, { replace: true })
   }, [newFromCalendar, setSearchParams])
+
+  // Vinda do hóspede: /cadastro/reservas?reservarPara=<id> abre uma reserva nova já com esse hóspede
+  const guestForReservation = searchParams.get('reservarPara')
+  useEffect(() => {
+    if (!guestForReservation) return
+    let cancelled = false
+    guestsApi
+      .get(guestForReservation)
+      .then(({ guest }) => {
+        if (cancelled) return
+        setPrefill({
+          mainGuest: {
+            id: guest.id,
+            fullName: guest.fullName,
+            documentType: guest.documentType,
+            documentNumber: guest.documentNumber,
+          },
+        })
+        setPendingLink(null)
+        setEditing(null)
+        setExtending(false)
+        setFormKey((k) => k + 1)
+        setFormOpen(true)
+      })
+      .catch((err) => !cancelled && showToast(err instanceof ApiError ? err.message : 'Não foi possível abrir a reserva'))
+      .finally(() => !cancelled && setSearchParams({}, { replace: true }))
+    return () => {
+      cancelled = true
+    }
+  }, [guestForReservation, setSearchParams, showToast])
 
   function openNew() {
     setEditing(null)

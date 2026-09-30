@@ -1,4 +1,4 @@
-import { Boxes, CalendarDays, ClipboardList, ShieldBan, Star, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { Boxes, CalendarDays, ClipboardList, Settings, ShieldBan, Star, Users, Wallet, type LucideIcon } from 'lucide-react'
 
 export interface MenuChild {
   label: string
@@ -35,4 +35,9 @@ export const MENU: MenuItem[] = [
   { label: 'Associados', icon: Users, to: '/associados' },
   { label: 'Avaliações', icon: Star, to: '/avaliacoes' },
   { label: 'Bloqueados', icon: ShieldBan, to: '/bloqueados' },
+  {
+    label: 'Ajustes',
+    icon: Settings,
+    children: [{ label: 'Taxas', to: '/ajustes/taxas' }],
+  },
 ]
