@@ -1,4 +1,4 @@
-import { query } from '../../db/pool.js';
+import { pool, query } from '../../db/pool.js';
 import { AppError } from '../../utils/AppError.js';
 import { alnum, normalizeDocument, type DocumentType } from '../../utils/documents.js';
 import { absolutePath, detectFileType, removeFile, saveFile } from '../../utils/storage.js';
@@ -35,6 +35,7 @@ interface GuestRow extends BlockColumnsRow {
   updated_by_name: string | null;
   rating_avg: number | null;
   rating_count: number;
+  reservations_count: number;
 }
 
 const toGuest = (r: GuestRow) => ({
@@ -67,6 +68,8 @@ const toGuest = (r: GuestRow) => ({
   // Média das avaliações internas das reservas em que ele foi o responsável
   averageRating: r.rating_avg,
   reviewsCount: r.rating_count,
+  // Reservas em que ele é o responsável (ao excluir o hóspede elas ficam sem hóspede)
+  reservationsCount: r.reservations_count,
   // Bloqueio (null = não bloqueado)
   blocked: toBlocked(r),
 });
@@ -74,6 +77,7 @@ const toGuest = (r: GuestRow) => ({
 const SELECT = `
   SELECT g.*, cu.name AS created_by_name, uu.name AS updated_by_name,
          rt.avg AS rating_avg, rt.total AS rating_count,
+         (SELECT COUNT(*)::int FROM reservations rc WHERE rc.main_guest_id = g.id) AS reservations_count,
          ${BLOCK_COLUMNS}
     FROM guests g
     LEFT JOIN guest_blocks gb ON gb.guest_id = g.id
@@ -273,6 +277,53 @@ export async function update(id: string, input: GuestInput, userId: string) {
   } catch (err) {
     handleUnique(err);
   }
+}
+
+/**
+ * Exclui o hóspede (e, por cascata, o bloqueio e os dependentes dele).
+ * As reservas dele NÃO são apagadas: ficam sem hóspede vinculado. Como isso muda dados,
+ * só acontece com `detachReservations` — senão devolve 409 com a quantidade de reservas.
+ */
+export async function remove(ownerId: string, id: string, detachReservations: boolean) {
+  const client = await pool.connect();
+  let photoPath: string | null = null;
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query<{ document_photo_path: string | null }>(
+      'SELECT document_photo_path FROM guests WHERE id = $1 AND owner_id = $2 FOR UPDATE',
+      [id, ownerId],
+    );
+    if (!rows[0]) throw new AppError('Hóspede não encontrado', 404);
+    photoPath = rows[0].document_photo_path;
+
+    const { rows: counts } = await client.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM reservations WHERE main_guest_id = $1 AND owner_id = $2',
+      [id, ownerId],
+    );
+    const total = counts[0].total;
+    if (total > 0) {
+      if (!detachReservations) {
+        throw new AppError(
+          `Este hóspede é o responsável por ${total} reserva${total > 1 ? 's' : ''}. Confirme para excluí-lo e manter a${total > 1 ? 's reservas' : ' reserva'} sem hóspede.`,
+          409,
+        );
+      }
+      await client.query(
+        'UPDATE reservations SET main_guest_id = NULL, updated_at = NOW() WHERE main_guest_id = $1 AND owner_id = $2',
+        [id, ownerId],
+      );
+    }
+
+    await client.query('DELETE FROM guests WHERE id = $1 AND owner_id = $2', [id, ownerId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+  // Só depois de confirmar no banco: apaga a foto do documento do disco
+  await removeFile(photoPath);
 }
 
 // ---------------------------------------------------------------------------

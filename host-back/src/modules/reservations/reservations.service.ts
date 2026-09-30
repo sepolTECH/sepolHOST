@@ -418,6 +418,23 @@ export function update(id: string, input: ReservationInput, userId: string) {
   });
 }
 
+/**
+ * Exclui a reserva. Acompanhantes, custos, extensões, anexos, avaliação, inventário, liberações
+ * para associados e vínculos com o calendário saem junto (ON DELETE CASCADE); os arquivos dos
+ * anexos são apagados do disco depois de confirmar no banco.
+ */
+export async function remove(ownerId: string, id: string) {
+  const { rows: files } = await query<{ file_path: string }>(
+    `SELECT a.file_path
+       FROM reservation_attachments a JOIN reservations r ON r.id = a.reservation_id
+      WHERE r.id = $1 AND r.owner_id = $2`,
+    [id, ownerId],
+  );
+  const { rowCount } = await query('DELETE FROM reservations WHERE id = $1 AND owner_id = $2', [id, ownerId]);
+  if (!rowCount) throw new AppError('Reserva não encontrada', 404);
+  await Promise.all(files.map((f) => removeFile(f.file_path)));
+}
+
 // ---------------------------------------------------------------------------
 // Anexos (documentos e fotos): arquivo em disco, metadados no banco
 // ---------------------------------------------------------------------------

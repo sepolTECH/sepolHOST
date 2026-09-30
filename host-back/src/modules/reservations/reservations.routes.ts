@@ -40,6 +40,12 @@ reservationsRoutes.put('/:id', async (req, res) => {
   res.json({ reservation: await reservationsService.update(id, input, req.user!.sub) });
 });
 
+reservationsRoutes.delete('/:id', async (req, res) => {
+  const { id } = idSchema.parse(req.params);
+  await reservationsService.remove(req.user!.sub, id);
+  res.status(204).end();
+});
+
 // ---------- Anexos (contrato, check-in, check-out...) ----------
 
 // Corpo = o próprio arquivo; categoria e nome vão na query (?category=CHECKIN&name=foto.jpg)

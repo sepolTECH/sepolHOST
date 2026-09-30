@@ -83,6 +83,15 @@ guestsRoutes.put('/:id', async (req, res) => {
   res.json({ guest: await guestsService.update(id, input, req.user!.sub) });
 });
 
+// Exclui o hóspede. Com reservas vinculadas, exige ?detachReservations=true (elas ficam sem hóspede).
+const deleteQuerySchema = z.object({ detachReservations: z.enum(['true', 'false']).optional() });
+guestsRoutes.delete('/:id', async (req, res) => {
+  const { id } = idSchema.parse(req.params);
+  const { detachReservations } = deleteQuerySchema.parse(req.query);
+  await guestsService.remove(req.user!.sub, id, detachReservations === 'true');
+  res.status(204).end();
+});
+
 // ---------- Foto do documento ----------
 
 guestsRoutes.get('/:id/document-photo', async (req, res) => {
