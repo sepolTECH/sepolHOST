@@ -474,7 +474,7 @@ export async function linkCandidates(
       'FROM reservations r',
       ', (SELECT f.name FROM calendar_event_links l JOIN calendar_feeds f ON f.id = l.feed_id WHERE l.reservation_id = r.id) AS linked_feed FROM reservations r',
     )}
-      WHERE r.owner_id = $3 AND (${where})
+      WHERE r.owner_id = $3 AND r.status <> 'CANCELADO' AND (${where})
       ORDER BY (r.check_in < $2::date AND r.final_check_out > $1::date) DESC,
                ABS(r.check_in - $1::date), r.check_in DESC
       LIMIT 20`,

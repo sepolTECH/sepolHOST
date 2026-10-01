@@ -7,7 +7,7 @@ import { resolveName as resolvePropertyName } from '../properties/properties.ser
 import { loadOnReservationCreated, resyncOnPropertyChange } from '../inventory/inventory.service.js';
 import type { AttachmentCategory, ListQuery, ReservationInput } from './reservations.schema.js';
 
-type Status = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO';
+type Status = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO' | 'CANCELADO';
 
 interface ReservationRow {
   id: string;
@@ -194,9 +194,10 @@ export async function list(ownerId: string, { search, status, page, pageSize }: 
 
   const { rows: countRows } = await query<{ total: number; amount: number; commission: number; costs: number }>(
     `SELECT COUNT(*)::int AS total,
-            COALESCE(SUM(r.amount_cents + r.extensions_cents + r.additions_cents), 0)::bigint AS amount,
-            COALESCE(SUM(r.commission_cents + r.extensions_commission_cents), 0)::bigint AS commission,
-            COALESCE(SUM(r.costs_cents), 0)::bigint AS costs
+            -- reservas canceladas continuam na lista, mas não entram nos somatórios
+            COALESCE(SUM(r.amount_cents + r.extensions_cents + r.additions_cents) FILTER (WHERE r.status <> 'CANCELADO'), 0)::bigint AS amount,
+            COALESCE(SUM(r.commission_cents + r.extensions_commission_cents) FILTER (WHERE r.status <> 'CANCELADO'), 0)::bigint AS commission,
+            COALESCE(SUM(r.costs_cents) FILTER (WHERE r.status <> 'CANCELADO'), 0)::bigint AS costs
        FROM reservations r LEFT JOIN guests g ON g.id = r.main_guest_id ${whereSql}`,
     params,
   );
@@ -460,6 +461,25 @@ export function update(id: string, rawInput: ReservationInput, userId: string) {
     if (previous[0]) await resyncOnPropertyChange(client, userId, id, previous[0].property_name);
     return getById(userId, id, client);
   });
+}
+
+/**
+ * Cancela a reserva (ou reativa, com `cancelled = false`). Ela continua na lista e com todos os dados,
+ * mas deixa de entrar nas finanças, no inventário/vistoria e nas avaliações. Reativada, volta como "Vazio"
+ * (o status pode ser ajustado na edição).
+ */
+export async function setCancelled(ownerId: string, userId: string, id: string, cancelled: boolean) {
+  const { rowCount } = await query(
+    `UPDATE reservations
+        SET status = $3, updated_by = $4, updated_at = NOW()
+      WHERE id = $1 AND owner_id = $2 AND (status = 'CANCELADO') <> $5`,
+    [id, ownerId, cancelled ? 'CANCELADO' : 'VAZIO', userId, cancelled],
+  );
+  if (!rowCount) {
+    // não achou, ou já estava no estado pedido
+    await getById(ownerId, id);
+  }
+  return getById(ownerId, id);
 }
 
 /**

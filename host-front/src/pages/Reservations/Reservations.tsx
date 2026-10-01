@@ -1,4 +1,4 @@
-import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Eye, Paperclip, Pencil, Plus, Search, Star, Trash2, UserCheck } from 'lucide-react'
+import { Ban, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Eye, Paperclip, Pencil, Plus, RotateCcw, Search, Star, Trash2, UserCheck } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Segmented } from '../../components/ui/Segmented'
@@ -230,6 +230,24 @@ export function Reservations() {
     setReloadKey((k) => k + 1)
   }
 
+  async function handleCancel(r: Reservation) {
+    const cancelling = r.status !== 'CANCELADO'
+    const ok = window.confirm(
+      cancelling
+        ? `Cancelar a reserva ${r.reservationNumber}?\n\nEla continua na lista com todos os dados, mas deixa de entrar nas finanças, no inventário/vistoria e nas avaliações. Você pode reativá-la depois.`
+        : `Reativar a reserva ${r.reservationNumber}?\n\nEla volta como “Vazio” e passa a contar de novo nas finanças. Ajuste o status na edição, se precisar.`,
+    )
+    if (!ok) return
+    try {
+      await (cancelling ? reservationsApi.cancel(r.id) : reservationsApi.reactivate(r.id))
+      showToast(cancelling ? 'Reserva cancelada' : 'Reserva reativada')
+      setViewing(null)
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Não foi possível alterar a reserva')
+    }
+  }
+
   async function handleDelete(r: Reservation) {
     const ok = window.confirm(
       [
@@ -383,7 +401,7 @@ export function Reservations() {
                   : result?.data.map((r, i) => (
                       <tr
                         key={r.id}
-                        className={`table__row ${openingId === r.id ? 'is-opening' : ''}`}
+                        className={`table__row ${openingId === r.id ? 'is-opening' : ''} ${r.status === 'CANCELADO' ? 'is-cancelled' : ''}`}
                         style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
                         onClick={() => openView(r)}
                       >
@@ -444,6 +462,7 @@ export function Reservations() {
                           >
                             <Eye strokeWidth={1.8} />
                           </button>
+                          {r.status !== 'CANCELADO' && (
                           <button
                             type="button"
                             className="icon-btn"
@@ -453,6 +472,7 @@ export function Reservations() {
                           >
                             <CalendarPlus strokeWidth={1.8} />
                           </button>
+                          )}
                           <button
                             type="button"
                             className="icon-btn"
@@ -463,7 +483,7 @@ export function Reservations() {
                             <Pencil strokeWidth={1.8} />
                           </button>
                           {/* A avaliação é do hóspede: sem hóspede vinculado não há o que avaliar */}
-                          {r.mainGuest && (
+                          {r.mainGuest && r.status !== 'CANCELADO' && (
                             <button
                               type="button"
                               className="icon-btn"
@@ -474,6 +494,7 @@ export function Reservations() {
                               <Star strokeWidth={1.8} />
                             </button>
                           )}
+                          {r.status !== 'CANCELADO' && (
                           <button
                             type="button"
                             className="icon-btn"
@@ -482,6 +503,16 @@ export function Reservations() {
                             title="Liberar para associados"
                           >
                             <UserCheck strokeWidth={1.8} />
+                          </button>
+                          )}
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={() => handleCancel(r)}
+                            aria-label={`${r.status === 'CANCELADO' ? 'Reativar' : 'Cancelar'} reserva ${r.reservationNumber}`}
+                            title={r.status === 'CANCELADO' ? 'Reativar reserva' : 'Cancelar reserva'}
+                          >
+                            {r.status === 'CANCELADO' ? <RotateCcw strokeWidth={1.8} /> : <Ban strokeWidth={1.8} />}
                           </button>
                           <button
                             type="button"

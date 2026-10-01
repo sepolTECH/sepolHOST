@@ -283,7 +283,8 @@ async function readReservation(client: PoolClient, userId: string, reservationId
 
 /** Lista as reservas com a situação da vistoria. */
 export async function listReservations(userId: string, { search, status, page, pageSize }: ReservationsQuery) {
-  const where: string[] = ['r.owner_id = $1'];
+  // Reservas canceladas não precisam de vistoria
+  const where: string[] = ['r.owner_id = $1', "r.status <> 'CANCELADO'"];
   const params: unknown[] = [userId];
   if (search) {
     params.push(`%${search}%`);

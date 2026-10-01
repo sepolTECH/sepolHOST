@@ -59,7 +59,7 @@ export async function listReservations(ownerId: string, associateId: string) {
        JOIN reservations r ON r.id = a.reservation_id
        LEFT JOIN guests g ON g.id = r.main_guest_id
        LEFT JOIN reservation_reviews rv ON rv.reservation_id = r.id
-      WHERE a.associate_id = $1 AND r.owner_id = $2
+      WHERE a.associate_id = $1 AND r.owner_id = $2 AND r.status <> 'CANCELADO'
       ORDER BY (r.inventory_status = 'VISTORIADO' AND (rv.id IS NOT NULL OR r.main_guest_id IS NULL)), r.final_check_out DESC, r.created_at DESC`,
     [associateId, ownerId],
   );

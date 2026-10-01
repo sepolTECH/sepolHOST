@@ -278,7 +278,7 @@ export interface DocumentLookup {
 // Reservas
 // ---------------------------------------------------------------------------
 
-export type ReservationStatus = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO'
+export type ReservationStatus = 'VAZIO' | 'HOSPEDADO' | 'CONCLUIDO' | 'CANCELADO'
 export type CommissionType = 'PERCENT' | 'VALUE'
 export type AgeGroup = 'ADULT' | 'CHILD'
 export type Platform = 'AIRBNB' | 'BOOKING' | 'VRBO' | 'DIRETO' | 'OUTRA'
@@ -456,6 +456,9 @@ export const reservationsApi = {
       `/reservations/${id}/attachments?${new URLSearchParams({ category, name: file.name })}`,
       { method: 'POST', body: file, headers: { 'Content-Type': file.type } },
     ),
+  /** Cancela a reserva mantendo os dados; `reactivate` desfaz (volta como "Vazio"). */
+  cancel: (id: string) => api<{ reservation: Reservation }>(`/reservations/${id}/cancel`, { method: 'POST' }),
+  reactivate: (id: string) => api<{ reservation: Reservation }>(`/reservations/${id}/reactivate`, { method: 'POST' }),
   /** Exclui a reserva (acompanhantes, custos, anexos, avaliação e inventário saem junto). */
   remove: (id: string) => api<void>(`/reservations/${id}`, { method: 'DELETE' }),
   removeAttachment: (id: string, attachmentId: string) =>

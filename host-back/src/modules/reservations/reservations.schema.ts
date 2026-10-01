@@ -128,7 +128,7 @@ export const reservationSchema = z
     checkOut: date('data do check-out'),
     checkInTime: timeOfDay,
     checkOutTime: timeOfDay,
-    status: z.enum(['VAZIO', 'HOSPEDADO', 'CONCLUIDO'], { message: 'Status inválido' }),
+    status: z.enum(['VAZIO', 'HOSPEDADO', 'CONCLUIDO', 'CANCELADO'], { message: 'Status inválido' }),
     platform: z.enum(PLATFORMS, { message: 'Selecione a plataforma de origem' }),
     paymentMethod: z
       .enum(PAYMENT_METHODS, { message: 'Forma de pagamento inválida' })
@@ -273,7 +273,7 @@ export const attachmentQuerySchema = z.object({
 
 export const listQuerySchema = z.object({
   search: z.string().trim().max(100).optional().default(''),
-  status: z.enum(['VAZIO', 'HOSPEDADO', 'CONCLUIDO']).optional(),
+  status: z.enum(['VAZIO', 'HOSPEDADO', 'CONCLUIDO', 'CANCELADO']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

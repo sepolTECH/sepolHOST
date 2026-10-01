@@ -39,7 +39,24 @@
 }
 
 .panel__filter.panel__filter--wide {
-  width: 380px;
+  width: 500px;
+  max-width: 100%;
+}
+/* 5 opções (Todas, Vazio, Hospedado, Concluído, Cancelado): nunca deixa o texto estourar o botão */
+.panel__filter--wide .ui-segmented button {
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* telas médias: a busca e o filtro quebram em duas linhas em vez de se espremerem */
+@media (max-width: 1100px) {
+  .panel__toolbar:has(.panel__filter--wide) {
+    flex-wrap: wrap;
+  }
+  .panel__filter.panel__filter--wide {
+    margin-left: 0;
+  }
 }
 
 /* ---------- Tabela ---------- */
@@ -105,6 +122,19 @@
 .status--concluido {
   color: var(--gray-600);
   background: var(--gray-100);
+}
+.status--cancelado {
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid currentColor;
+}
+/* Reserva cancelada: continua na lista, mais apagada e com os valores riscados */
+.table__row.is-cancelled td:not(.table__actions) {
+  opacity: 0.6;
+}
+.table__row.is-cancelled .res-net,
+.table__row.is-cancelled td[data-label='Valor'] {
+  text-decoration: line-through;
 }
 @keyframes pulse {
   50% {
@@ -517,6 +547,11 @@
 @media (max-width: 720px) {
   .panel__filter.panel__filter--wide {
     width: 100%;
+  }
+  .panel__filter--wide .ui-segmented button {
+    padding: 0;
+    font-size: 10px;
+    text-overflow: clip;
   }
   .table--reservations td:nth-child(3),
   .table--reservations td:nth-child(6) {

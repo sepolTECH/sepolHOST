@@ -157,7 +157,7 @@ async function computeClosing(ownerId: string, year: number, month: number) {
               r.extensions_commission_cents::float8 AS extensions_commission_cents
          FROM reservations r
          LEFT JOIN guests g ON g.id = r.main_guest_id
-        WHERE r.owner_id = $5
+        WHERE r.owner_id = $5 AND r.status <> 'CANCELADO'
           AND ((r.final_check_out >= $1::date AND r.final_check_out < $2::date)
             OR (r.final_check_out >= $3::date AND r.final_check_out < $4::date
                 AND (r.costs_cents > 0 OR r.additions_cents > 0)))

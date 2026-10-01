@@ -103,7 +103,8 @@ function toItem(r: Row) {
 }
 
 export async function list(ownerId: string, { search, reviewed, page, pageSize }: ListQuery) {
-  const where: string[] = ['r.owner_id = $1'];
+  // Reservas canceladas não são avaliadas
+  const where: string[] = ['r.owner_id = $1', "r.status <> 'CANCELADO'"];
   const params: unknown[] = [ownerId];
 
   if (search) {

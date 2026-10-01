@@ -83,7 +83,7 @@ async function computeMonth(ownerId: string, year: number, month: number) {
             r.extensions_cents::float8 AS extensions_cents, r.extensions_commission_cents::float8 AS extensions_commission_cents
        FROM reservations r
        LEFT JOIN guests g ON g.id = r.main_guest_id
-      WHERE r.owner_id = $3 AND r.check_in < $2::date AND r.final_check_out >= $1::date
+      WHERE r.owner_id = $3 AND r.status <> 'CANCELADO' AND r.check_in < $2::date AND r.final_check_out >= $1::date
       ORDER BY r.check_in, r.created_at`,
     [start, end, ownerId],
   );

@@ -40,6 +40,17 @@ reservationsRoutes.put('/:id', async (req, res) => {
   res.json({ reservation: await reservationsService.update(id, input, req.user!.sub) });
 });
 
+// Cancela a reserva mantendo os dados (some das finanças, vistoria e avaliações); "reativar" desfaz
+reservationsRoutes.post('/:id/cancel', async (req, res) => {
+  const { id } = idSchema.parse(req.params);
+  res.json({ reservation: await reservationsService.setCancelled(req.user!.sub, req.user!.sub, id, true) });
+});
+
+reservationsRoutes.post('/:id/reactivate', async (req, res) => {
+  const { id } = idSchema.parse(req.params);
+  res.json({ reservation: await reservationsService.setCancelled(req.user!.sub, req.user!.sub, id, false) });
+});
+
 reservationsRoutes.delete('/:id', async (req, res) => {
   const { id } = idSchema.parse(req.params);
   await reservationsService.remove(req.user!.sub, id);

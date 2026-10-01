@@ -196,7 +196,8 @@
 .ui-segmented {
   position: relative;
   display: grid;
-  grid-auto-columns: 1fr;
+  /* colunas sempre iguais (minmax(0, 1fr)): com 1fr o texto mais largo alargava a coluna e a pílula saía do lugar */
+  grid-auto-columns: minmax(0, 1fr);
   grid-auto-flow: column;
   height: 42px;
   padding: 3px;
