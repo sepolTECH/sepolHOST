@@ -131,6 +131,14 @@ function RangeDialog({ checkIn, checkOut, onClose, onConfirm }: RangeDialogProps
     return { y, m: m - 1 }
   })
 
+  // Anos do seletor: 5 antes e 10 depois do ano atual, sempre incluindo o ano em exibição (setas) e o da reserva
+  const yearOptions = useMemo(() => {
+    const thisYear = Number(today.slice(0, 4))
+    const from = Math.min(thisYear - 5, view.y, checkIn ? Number(checkIn.slice(0, 4)) : thisYear)
+    const to = Math.max(thisYear + 10, view.y + 1)
+    return Array.from({ length: to - from + 1 }, (_, i) => from + i)
+  }, [today, view.y, checkIn])
+
   const second = shiftMonth(view.y, view.m, 1)
   const months = useMemo(() => [view, second], [view, second.y, second.m]) // eslint-disable-line react-hooks/exhaustive-deps
   const focusDay = start || today
@@ -199,16 +207,42 @@ function RangeDialog({ checkIn, checkOut, onClose, onConfirm }: RangeDialogProps
           >
             <ChevronLeft size={18} strokeWidth={1.8} />
           </button>
-          <button
-            type="button"
-            className="range__today"
-            onClick={() => {
-              const [y, m] = today.split('-').map(Number)
-              setView({ y, m: m - 1 })
-            }}
-          >
-            Hoje
-          </button>
+          <div className="range__jump">
+            <select
+              className="range__select"
+              aria-label="Ir para o mês"
+              value={view.m}
+              onChange={(e) => setView((v) => ({ ...v, m: Number(e.target.value) }))}
+            >
+              {MONTHS.map((name, i) => (
+                <option key={name} value={i}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="range__select"
+              aria-label="Ir para o ano"
+              value={view.y}
+              onChange={(e) => setView((v) => ({ ...v, y: Number(e.target.value) }))}
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="range__today"
+              onClick={() => {
+                const [y, m] = today.split('-').map(Number)
+                setView({ y, m: m - 1 })
+              }}
+            >
+              Hoje
+            </button>
+          </div>
           <button
             type="button"
             className="icon-btn"

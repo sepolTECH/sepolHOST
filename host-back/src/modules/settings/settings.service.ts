@@ -1,6 +1,7 @@
 import { pool, query } from '../../db/pool.js';
+import { AppError } from '../../utils/AppError.js';
 import { PLATFORMS } from '../reservations/reservations.schema.js';
-import type { SaveFeesInput } from './settings.schema.js';
+import type { PresetInput, SaveFeesInput } from './settings.schema.js';
 
 export interface PlatformFee {
   platform: (typeof PLATFORMS)[number];
@@ -43,4 +44,68 @@ export async function saveFees(ownerId: string, input: SaveFeesInput): Promise<P
     client.release();
   }
   return listFees(ownerId);
+}
+
+// ---------------------------------------------------------------------------
+// Valores padrão: adicionais a receber e custos/taxas com valor sugerido
+// ---------------------------------------------------------------------------
+
+interface PresetRow {
+  id: string;
+  kind: PresetInput['kind'];
+  name: string;
+  amount_cents: number;
+}
+
+const toPreset = (r: PresetRow) => ({ id: r.id, kind: r.kind, name: r.name, amountCents: Number(r.amount_cents) });
+
+const PRESET_COLUMNS = 'id, kind, name, amount_cents::float8 AS amount_cents';
+
+function handlePresetError(err: unknown): never {
+  if ((err as { code?: string }).code === '23505') throw new AppError('Já existe um item com esse nome', 409);
+  throw err;
+}
+
+export async function listPresets(ownerId: string) {
+  const { rows } = await query<PresetRow>(
+    `SELECT ${PRESET_COLUMNS} FROM reservation_presets WHERE owner_id = $1 ORDER BY kind, LOWER(name)`,
+    [ownerId],
+  );
+  return rows.map(toPreset);
+}
+
+export async function createPreset(ownerId: string, userId: string, input: PresetInput) {
+  try {
+    const { rows } = await query<PresetRow>(
+      `INSERT INTO reservation_presets (owner_id, kind, name, amount_cents, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $5)
+       RETURNING ${PRESET_COLUMNS}`,
+      [ownerId, input.kind, input.name, input.amountCents, userId],
+    );
+    return toPreset(rows[0]);
+  } catch (err) {
+    handlePresetError(err);
+  }
+}
+
+export async function updatePreset(ownerId: string, userId: string, id: string, input: PresetInput) {
+  try {
+    const { rows } = await query<PresetRow>(
+      `UPDATE reservation_presets
+          SET kind = $3, name = $4, amount_cents = $5, updated_by = $6, updated_at = NOW()
+        WHERE id = $1 AND owner_id = $2
+        RETURNING ${PRESET_COLUMNS}`,
+      [id, ownerId, input.kind, input.name, input.amountCents, userId],
+    );
+    if (!rows[0]) throw new AppError('Item não encontrado', 404);
+    return toPreset(rows[0]);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    handlePresetError(err);
+  }
+}
+
+export async function removePreset(ownerId: string, id: string) {
+  const { rowCount } = await query('DELETE FROM reservation_presets WHERE id = $1 AND owner_id = $2', [id, ownerId]);
+  if (!rowCount) throw new AppError('Item não encontrado', 404);
 }

@@ -73,7 +73,7 @@ export const guestSchema = z
       }
     }
 
-    if (foreign && g.nationality.length < 2) issue('nationality', 'Informe a nacionalidade');
+    // Nacionalidade do estrangeiro é opcional (pode ficar vazia)
 
     if (normalizeName(g.fullName, g.personType).length < 3) issue('fullName', 'Informe o nome completo');
 

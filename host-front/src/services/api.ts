@@ -769,6 +769,11 @@ export interface ClosingCostStay extends ClosingStayBase {
   costsCents: number
 }
 
+/** Valores adicionais recebidos no mês do check-out final (sem comissão, pagos direto). */
+export interface ClosingAdditionStay extends ClosingStayBase {
+  additionsCents: number
+}
+
 export interface CarneLeao {
   incomeCents: number
   rentalDeductionsCents: number
@@ -799,7 +804,10 @@ export interface ClosingMonth {
   totals: {
     reservations: number // hospedagens recebidas
     costReservations: number // hospedagens com custos no mês
-    grossCents: number
+    additionReservations: number // hospedagens com valores adicionais no mês do check-out
+    grossCents: number // locações + valores adicionais
+    rentalCents: number // só as locações (repasse do mês seguinte)
+    additionsCents: number // valores adicionais (mês do check-out)
     extensionsCents: number
     commissionCents: number
     costsCents: number
@@ -816,6 +824,7 @@ export interface ClosingMonth {
     propertyName: string
     reservations: number
     grossCents: number
+    additionsCents: number // parte do bruto que são valores adicionais
     commissionCents: number
     costsCents: number
     netCents: number
@@ -825,6 +834,7 @@ export interface ClosingMonth {
   }[]
   stays: ClosingStay[]
   costStays: ClosingCostStay[]
+  additionStays: ClosingAdditionStay[]
   expenses: MonthExpense[]
   properties: string[]
   previous: { year: number; month: number; grossCents: number; finalCents: number }
@@ -1243,10 +1253,28 @@ export interface PlatformFee {
   commissionRate: number | null
 }
 
+/** Item pré-cadastrado (Ajustes > Valores padrão): adicional a receber ou custo/taxa, com valor sugerido. */
+export type PresetKind = 'ADDITION' | 'COST'
+
+export interface Preset {
+  id: string
+  kind: PresetKind
+  name: string
+  amountCents: number
+}
+
+export type PresetInput = Omit<Preset, 'id'>
+
 export const settingsApi = {
   fees: (signal?: AbortSignal) => api<{ data: PlatformFee[] }>('/settings/fees', { signal }),
   saveFees: (fees: PlatformFee[]) =>
     api<{ data: PlatformFee[] }>('/settings/fees', { method: 'PUT', body: JSON.stringify({ fees }) }),
+  presets: (signal?: AbortSignal) => api<{ data: Preset[] }>('/settings/presets', { signal }),
+  createPreset: (input: PresetInput) =>
+    api<{ preset: Preset }>('/settings/presets', { method: 'POST', body: JSON.stringify(input) }),
+  updatePreset: (id: string, input: PresetInput) =>
+    api<{ preset: Preset }>(`/settings/presets/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  removePreset: (id: string) => api<void>(`/settings/presets/${id}`, { method: 'DELETE' }),
 }
 
 // ---------------------------------------------------------------------------

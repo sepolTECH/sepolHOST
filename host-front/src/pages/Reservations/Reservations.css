@@ -931,3 +931,40 @@
     flex-direction: column;
   }
 }
+
+/* Atalhos dos valores padrão (Ajustes > Valores padrão) */
+.preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 10px;
+}
+.preset-chips__label {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-strong);
+  background: var(--gray-100);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.preset-chip:hover:not(:disabled) {
+  border-color: var(--gray-400, var(--border));
+}
+.preset-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.preset-chip small {
+  font-size: 12px;
+  color: var(--gray-500);
+}

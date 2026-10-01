@@ -7,6 +7,7 @@ import {
   ApiError,
   financeApi,
   type ClosingCostStay,
+  type ClosingAdditionStay,
   type ClosingMonth,
   type ClosingSettings,
   type ClosingStay,
@@ -130,7 +131,8 @@ export function Closing() {
                 {lower(data.reference.month)} de {data.reference.year}
               </strong>{' '}
               (o repasse cai no mês seguinte) e saem os custos das hospedagens com check-out em{' '}
-              <strong>{lower(data.period.month)}</strong>.
+              <strong>{lower(data.period.month)}</strong>, junto com os valores adicionais (pagos direto) das hospedagens
+              com check-out em <strong>{lower(data.period.month)}</strong>.
             </span>
           </p>
 
@@ -141,6 +143,7 @@ export function Closing() {
               <strong>{formatMoney(t.grossCents)}</strong>
               <small className="kpi__hint">
                 {t.reservations} {t.reservations === 1 ? 'hospedagem' : 'hospedagens'}
+                {t.additionsCents > 0 && <> · {formatMoney(t.additionsCents)} em adicionais</>}
               </small>
             </div>
             <div className="kpi">
@@ -149,7 +152,7 @@ export function Closing() {
               <small className="kpi__hint">
                 {t.commissionCents > 0 && (
                   <>
-                    <CommissionPct commission={t.commissionCents} base={t.grossCents} /> do bruto ·{' '}
+                    <CommissionPct commission={t.commissionCents} base={t.rentalCents} /> do bruto ·{' '}
                   </>
                 )}
                 das {t.reservations} {t.reservations === 1 ? 'hospedagem recebida' : 'hospedagens recebidas'}
@@ -250,14 +253,19 @@ export function Closing() {
                             <small>
                               {p.reservations
                                 ? `${p.reservations} ${p.reservations === 1 ? 'hospedagem recebida' : 'hospedagens recebidas'}`
-                                : 'nenhum recebimento no mês'}
+                                : p.additionsCents > 0
+                                  ? 'só valores adicionais no mês'
+                                  : 'nenhum recebimento no mês'}
                             </small>
                           </span>
                         </td>
                         <td data-label="Bruto" className="num guest-form__mono">
                           {formatMoney(p.grossCents)}
+                          {p.additionsCents > 0 && (
+                            <small className="closing__cell-hint">inclui {formatMoney(p.additionsCents)} adicionais</small>
+                          )}
                         </td>
-                        <Minus label="Comissões" cents={p.commissionCents} base={p.grossCents} />
+                        <Minus label="Comissões" cents={p.commissionCents} base={p.grossCents - p.additionsCents} />
                         <Minus label="Custos" cents={p.costsCents} />
                         <Minus label="Despesas" cents={p.expensesCents} />
                         <Minus label="Taxa adm." cents={p.adminFeeCents} />
@@ -358,14 +366,61 @@ export function Closing() {
                     <tr>
                       <td colSpan={3}>Total recebido</td>
                       <td data-label="Bruto" className="num guest-form__mono">
-                        {formatMoney(t.grossCents)}
+                        {formatMoney(t.rentalCents)}
                       </td>
                       <td data-label="Comissão" className="num guest-form__mono">
                         − {formatMoney(t.commissionCents)}
-                        <CommissionPct commission={t.commissionCents} base={t.grossCents} />
+                        <CommissionPct commission={t.commissionCents} base={t.rentalCents} />
                       </td>
                       <td data-label="Recebido" className="num guest-form__mono">
-                        {formatMoney(t.grossCents - t.commissionCents)}
+                        {formatMoney(t.rentalCents - t.commissionCents)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* ---------- Valores adicionais (recebidos no mês do check-out) ---------- */}
+          {data.additionStays.length > 0 && (
+            <section className="panel">
+              <h2 className="finance__panel-title">
+                Valores adicionais
+                <small>{data.additionStays.length}</small>
+                <span className="closing__panel-sub">check-out em {lower(data.period.month)} · sem comissão</span>
+              </h2>
+              <div className="table-wrap">
+                <table className="table table--closing">
+                  <thead>
+                    <tr>
+                      <th>Reserva</th>
+                      <th>Hóspede / imóvel</th>
+                      <th>Período</th>
+                      <th className="num">Adicionais</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.additionStays.map((r, i) => (
+                      <tr
+                        key={r.id}
+                        className="table__row"
+                        style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
+                        onClick={() => navigate(`/cadastro/reservas?reserva=${r.id}`)}
+                        title="Abrir reserva"
+                      >
+                        <StayCells stay={r} />
+                        <td data-label="Adicionais" className="num guest-form__mono res-net">
+                          {formatMoney(r.additionsCents)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3}>Total de adicionais</td>
+                      <td data-label="Adicionais" className="num guest-form__mono">
+                        {formatMoney(t.additionsCents)}
                       </td>
                     </tr>
                   </tfoot>
@@ -424,7 +479,8 @@ export function Closing() {
             <span>
               Aqui as datas não são quebradas: o valor da locação (com extensões) entra inteiro no mês seguinte ao
               check-out final — check-out em 01/10 é recebido em novembro — e os custos da hospedagem (limpeza,
-              reposição…) saem no mês do próprio check-out, em outubro nesse exemplo. Para ver o faturamento proporcional
+              reposição…) saem no mês do próprio check-out, em outubro nesse exemplo. Os valores adicionais (hóspede extra,
+              pet, horas…) também caem no mês do check-out, pois costumam ser pagos direto. Para ver o faturamento proporcional
               aos dias de cada mês, use o{' '}
               <Link to={`/financas/relatorio${monthQuery(year, month)}`} className="finance__link">
                 Relatório financeiro
@@ -444,7 +500,7 @@ export function Closing() {
 }
 
 /** Reserva, hóspede/imóvel e período (colunas comuns das tabelas do fechamento). */
-function StayCells({ stay: r }: { stay: ClosingStay | ClosingCostStay }) {
+function StayCells({ stay: r }: { stay: ClosingStay | ClosingCostStay | ClosingAdditionStay }) {
   return (
     <>
       <td data-label="Reserva" className="res-number">
@@ -504,10 +560,20 @@ function Statement({ data }: { data: ClosingMonth }) {
   const t = data.totals
   const { adminFee } = data.settings
   const rows: { label: string; hint?: string; cents: number; kind: 'in' | 'out' | 'subtotal' | 'final' }[] = [
-    { label: 'Bruto das hospedagens', hint: `${t.reservations} com check-out em ${lower(data.reference.month)}`, cents: t.grossCents, kind: 'in' },
+    { label: 'Bruto das hospedagens', hint: `${t.reservations} com check-out em ${lower(data.reference.month)}`, cents: t.rentalCents, kind: 'in' },
+    ...(t.additionsCents > 0
+      ? [
+          {
+            label: 'Valores adicionais',
+            hint: `${t.additionReservations} com check-out em ${lower(data.period.month)} · sem comissão`,
+            cents: t.additionsCents,
+            kind: 'in' as const,
+          },
+        ]
+      : []),
     {
       label: 'Comissões das plataformas',
-      hint: `${commissionPercent(t.commissionCents, t.grossCents) ?? '0%'} do bruto · das ${t.reservations} recebidas`,
+      hint: `${commissionPercent(t.commissionCents, t.rentalCents) ?? '0%'} do bruto · das ${t.reservations} recebidas`,
       cents: t.commissionCents,
       kind: 'out',
     },
@@ -517,7 +583,7 @@ function Statement({ data }: { data: ClosingMonth }) {
       cents: t.costsCents,
       kind: 'out',
     },
-    { label: 'Resultado das hospedagens', hint: 'recebido − custos do mês, sem quebrar datas', cents: t.netCents, kind: 'subtotal' },
+    { label: 'Resultado das hospedagens', hint: 'recebido + adicionais − custos do mês, sem quebrar datas', cents: t.netCents, kind: 'subtotal' },
     { label: 'Despesas do mês', hint: 'condomínio, IPTU, contas…', cents: t.expensesCents, kind: 'out' },
     {
       label: 'Taxa de administração',
@@ -661,7 +727,7 @@ function SettingsPanel({ data, onSaved }: { data: ClosingMonth; onSaved: (result
                 />
                 <p className="ui-field__hint">
                   {draft.adminFee.base === 'GROSS'
-                    ? `Bruto das hospedagens: ${formatMoney(t.grossCents)}.`
+                    ? `Bruto das hospedagens e valores adicionais: ${formatMoney(t.grossCents)}.`
                     : `Bruto − comissões − custos das hospedagens: ${formatMoney(t.netCents)}.`}{' '}
                   Taxa: <strong>{formatMoney(adminPreview)}</strong>
                 </p>

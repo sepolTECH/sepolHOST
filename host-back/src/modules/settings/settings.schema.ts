@@ -19,3 +19,22 @@ export const saveFeesSchema = z.object({
 });
 
 export type SaveFeesInput = z.infer<typeof saveFeesSchema>;
+
+export const PRESET_KINDS = ['ADDITION', 'COST'] as const;
+
+/** Item pré-cadastrado de "valores adicionais" (ADDITION) ou "custos e taxas" (COST) com o valor sugerido. */
+export const presetSchema = z.object({
+  kind: z.enum(PRESET_KINDS, { message: 'Tipo inválido' }),
+  name: z
+    .string({ message: 'Informe o nome' })
+    .trim()
+    .transform((v) => v.replace(/\s+/g, ' '))
+    .pipe(z.string().min(2, 'Informe o nome').max(120, 'Nome muito longo')),
+  amountCents: z
+    .number({ message: 'Informe o valor' })
+    .int('Valor inválido')
+    .positive('Informe o valor')
+    .max(100_000_000_00, 'Valor muito alto'),
+});
+
+export type PresetInput = z.infer<typeof presetSchema>;

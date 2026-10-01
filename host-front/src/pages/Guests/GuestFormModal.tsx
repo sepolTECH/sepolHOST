@@ -132,7 +132,6 @@ function validate(v: GuestInput): Errors {
   }
   if (!v.noDocument) add('documentNumber', validateDocument(v.documentType, v.documentNumber))
   if (cleanName(v.fullName, v.personType).length < 3) e.fullName = 'Informe o nome completo'
-  if (v.isForeign && v.nationality.trim().length < 2) e.nationality = 'Informe a nacionalidade'
   if (v.personType === 'PF' && !v.isForeign) add('rg', validateRg(v.rg))
   add('email', validateEmail(v.email))
   add('phone', validatePhone(v.phone))
@@ -793,9 +792,7 @@ export function GuestFormModal({ open, guest, onClose, onSaved, onEditExisting, 
 
               {isPF && values.isForeign && (
                 <div className={field('nationality')}>
-                  <label htmlFor="guest-nationality">
-                    Nacionalidade<span className="req">*</span>
-                  </label>
+                  <label htmlFor="guest-nationality">Nacionalidade</label>
                   <input
                     className="ui-input"
                     list="guest-nationalities"

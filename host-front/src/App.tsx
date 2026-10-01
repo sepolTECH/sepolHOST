@@ -22,6 +22,7 @@ import { Reservations } from './pages/Reservations/Reservations'
 import { ResetPassword } from './pages/ResetPassword/ResetPassword'
 import { Reviews } from './pages/Reviews/Reviews'
 import { Fees } from './pages/Settings/Fees'
+import { Presets } from './pages/Settings/Presets'
 import { Properties } from './pages/Settings/Properties'
 
 function App() {
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/ajustes" element={<Navigate to="/ajustes/imoveis" replace />} />
                 <Route path="/ajustes/imoveis" element={<Properties />} />
                 <Route path="/ajustes/taxas" element={<Fees />} />
+                <Route path="/ajustes/valores-padrao" element={<Presets />} />
               </Route>
             </Route>
 

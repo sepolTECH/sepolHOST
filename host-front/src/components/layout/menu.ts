@@ -41,6 +41,7 @@ export const MENU: MenuItem[] = [
     children: [
       { label: 'Imóveis', to: '/ajustes/imoveis' },
       { label: 'Taxas', to: '/ajustes/taxas' },
+      { label: 'Valores padrão', to: '/ajustes/valores-padrao' },
     ],
   },
 ]

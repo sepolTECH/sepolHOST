@@ -11,6 +11,8 @@ import { computeCarneLeao, DEDUCTIBLE_CATEGORIES } from './tax.js';
  *   ao check-out final, quando o repasse cai.  check-out 30/09 → outubro; 01/10 → novembro.
  * - Custos da hospedagem (limpeza, reposição...): entram inteiros no mês do check-out final,
  *   quando são pagos.  check-out 01/10 → custos no fechamento de outubro.
+ * - Valores adicionais (hóspede extra, pet, horas...): sem comissão e geralmente pagos direto pelo hóspede,
+ *   então entram inteiros no mês do check-out final (não esperam o repasse da plataforma).
  *
  * Líquido final = bruto − comissões − custos das hospedagens     (= resultado do relatório)
  *                 − despesas do mês − taxa de administração − carnê-leão
@@ -157,7 +159,8 @@ async function computeClosing(ownerId: string, year: number, month: number) {
          LEFT JOIN guests g ON g.id = r.main_guest_id
         WHERE r.owner_id = $5
           AND ((r.final_check_out >= $1::date AND r.final_check_out < $2::date)
-            OR (r.final_check_out >= $3::date AND r.final_check_out < $4::date AND r.costs_cents > 0))
+            OR (r.final_check_out >= $3::date AND r.final_check_out < $4::date
+                AND (r.costs_cents > 0 OR r.additions_cents > 0)))
         ORDER BY r.final_check_out, r.check_in, r.created_at`,
       [refStart, refEnd, monthStart, monthEnd, ownerId],
     ),
@@ -183,14 +186,13 @@ async function computeClosing(ownerId: string, year: number, month: number) {
   const stays = rows
     .filter((r) => inRange(r.final_check_out, refStart, refEnd))
     .map((r) => {
-      // valores adicionais (hóspede extra, pet…) entram no bruto, sem comissão
-      const grossCents = r.amount_cents + r.extensions_cents + r.additions_cents;
+      // os valores adicionais NÃO entram aqui: caem no mês do check-out (additionStays)
+      const grossCents = r.amount_cents + r.extensions_cents;
       const commissionCents = r.commission_cents + r.extensions_commission_cents;
       return {
         ...base(r),
         grossCents,
         extensionsCents: r.extensions_cents,
-        additionsCents: r.additions_cents,
         commissionCents,
         netCents: grossCents - commissionCents, // valor que cai na conta
       };
@@ -199,6 +201,11 @@ async function computeClosing(ownerId: string, year: number, month: number) {
   const costStays = rows
     .filter((r) => inRange(r.final_check_out, monthStart, monthEnd) && r.costs_cents > 0)
     .map((r) => ({ ...base(r), costsCents: r.costs_cents }));
+
+  // Valores adicionais recebidos neste mês (hospedagens que terminaram neste mês), sem comissão
+  const additionStays = rows
+    .filter((r) => inRange(r.final_check_out, monthStart, monthEnd) && r.additions_cents > 0)
+    .map((r) => ({ ...base(r), additionsCents: r.additions_cents }));
 
   const { adminFee } = settings;
   const adminFeeOf = (gross: number, net: number) => {
@@ -211,7 +218,8 @@ async function computeClosing(ownerId: string, year: number, month: number) {
   type PropertyTotals = {
     propertyName: string;
     reservations: number;
-    grossCents: number;
+    grossCents: number; // locações recebidas + valores adicionais
+    additionsCents: number; // parte do bruto que são valores adicionais
     commissionCents: number;
     costsCents: number;
     netCents: number; // resultado do relatório (bruto − comissões − custos)
@@ -220,7 +228,7 @@ async function computeClosing(ownerId: string, year: number, month: number) {
     resultCents: number; // antes do carnê-leão
   };
   const empty = (propertyName: string): PropertyTotals => ({
-    propertyName, reservations: 0, grossCents: 0, commissionCents: 0, costsCents: 0, netCents: 0, expensesCents: 0, adminFeeCents: 0, resultCents: 0,
+    propertyName, reservations: 0, grossCents: 0, additionsCents: 0, commissionCents: 0, costsCents: 0, netCents: 0, expensesCents: 0, adminFeeCents: 0, resultCents: 0,
   });
   const props = new Map<string, PropertyTotals>();
   for (const s of stays) {
@@ -229,6 +237,13 @@ async function computeClosing(ownerId: string, year: number, month: number) {
     p.reservations += 1;
     p.grossCents += s.grossCents;
     p.commissionCents += s.commissionCents;
+    props.set(k, p);
+  }
+  for (const a of additionStays) {
+    const k = propertyKey(a.propertyName);
+    const p = props.get(k) ?? empty(a.propertyName);
+    p.grossCents += a.additionsCents;
+    p.additionsCents += a.additionsCents;
     props.set(k, p);
   }
   for (const c of costStays) {
@@ -252,7 +267,9 @@ async function computeClosing(ownerId: string, year: number, month: number) {
   }
 
   const sum = <T>(list: T[], pick: (x: T) => number) => list.reduce((s, x) => s + pick(x), 0);
-  const grossCents = sum(stays, (s) => s.grossCents);
+  const rentalCents = sum(stays, (s) => s.grossCents); // locações (repasse do mês seguinte)
+  const additionsCents = sum(additionStays, (a) => a.additionsCents);
+  const grossCents = rentalCents + additionsCents;
   const commissionCents = sum(stays, (s) => s.commissionCents);
   const costsCents = sum(costStays, (c) => c.costsCents);
   const netCents = grossCents - commissionCents - costsCents;
@@ -286,9 +303,11 @@ async function computeClosing(ownerId: string, year: number, month: number) {
     totals: {
       reservations: stays.length,
       costReservations: costStays.length,
-      grossCents,
+      grossCents, // locações + valores adicionais
+      rentalCents,
       extensionsCents: sum(stays, (s) => s.extensionsCents),
-      additionsCents: sum(stays, (s) => s.additionsCents),
+      additionsCents,
+      additionReservations: additionStays.length,
       commissionCents,
       costsCents,
       netCents,
@@ -311,6 +330,7 @@ async function computeClosing(ownerId: string, year: number, month: number) {
     ),
     stays,
     costStays,
+    additionStays,
     expenses,
   };
 }
